@@ -9,15 +9,16 @@ import {
   Nunito_700Bold,
   Nunito_900Black,
 } from "@expo-google-fonts/nunito";
+import { Ionicons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 
 // this is the expo splash screen.
 import * as ExpoSplashScreen from "expo-splash-screen";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from "react-native";
 
 // Keep the native splash visible while we load
 ExpoSplashScreen.preventAutoHideAsync();
@@ -26,7 +27,7 @@ export default function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
   const [appReady, setAppReady] = useState<boolean>(false);
   const [splashDone, setSplashDone] = useState<boolean>(false);
-  
+
   // this is the expo font loader.
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
@@ -53,6 +54,9 @@ export default function RootLayout() {
   const isLoggedIn = !isPending && !!session;
   const isLoggedOut = !isPending && !session;
 
+  console.log(isLoggedIn, isLoggedOut);
+
+
   // Show nothing until fonts are ready
   if (!appReady) return null;
 
@@ -68,6 +72,7 @@ export default function RootLayout() {
     },
   });
 
+  
   return (
     <QueryClientProvider client={queryClient}>
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
@@ -97,64 +102,34 @@ export default function RootLayout() {
               options={{
                 headerShown: false,
               }}
-
             />
-            <Stack.Screen
-              name="profile"
-              options={{
-                headerShown: true,
-                headerTitle: "Profile",
-                headerTintColor: '#fff',
-                headerStyle: {
-                  backgroundColor: Colors.primary,
-                },
-                headerTitleAlign: "center",
-                headerTitleStyle: {
-                  color: '#fff',
-                },
-              }}
 
-            />
-            <Stack.Screen
-              name="wallet"
-              options={{
-                headerShown: true,
-                headerTitle: "Wallet",
-                headerTintColor: '#fff',
-                headerStyle: {
-                  backgroundColor: Colors.primary,
-                },
-                headerTitleAlign: "center",
-                headerTitleStyle: {
-                  color: '#fff',
-                },
-              }}
 
-            />
-            <Stack.Screen
-              name="search"
-              options={{
-                headerShown: false,
-                headerTitle: "Search",
-              }}
+<Stack.Screen
+  name="restaurantForm"
+  options={{
+    headerShown: true,
+    headerTitle: "Become a Partner",
+    headerTintColor: "#fff",
+    headerStyle: {
+      backgroundColor: Colors.primary,
+    },
+    headerTitleAlign: "center",
+    headerTitleStyle: {
+      color: "#fff",
+    },
 
-            />
-            <Stack.Screen
-              name="restaurants"
-              options={{
-                headerShown: false,
-                headerTitle: "Restaurants",
-              }}
-
-            />
-            <Stack.Screen
-              name="checkout"
-              options={{
-                headerShown: true,
-                headerTitle: "Checkout",
-              }}
-
-            />
+    headerLeft: () => (
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={{ marginLeft: 10 }}
+      >
+        <Ionicons name="arrow-back" size={24} color="#fff" />
+      </TouchableOpacity>
+    ),
+  }}
+/>
+            <Stack.Screen name="anu"/>
           </Stack.Protected>
         </Stack>
       </View>
