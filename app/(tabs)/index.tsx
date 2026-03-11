@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, Tabs } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef} from "react";
 import { usePartnerStore } from "@/store/usePartner";
 import {
     Animated,
-    Dimensions,
+
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -39,7 +39,7 @@ export default function HomeScreen() {
     const { data: session } = authClient.useSession();
     const user = session?.user as AppUser | undefined;
     const { data: application, isLoading: applicationLoading } = useMyRestaurantApplication();
-    console.log(application);
+    console.log(session?.user);
 
 
     React.useEffect(() => {
@@ -57,7 +57,7 @@ export default function HomeScreen() {
                 }),
             ])
         ).start();
-    }, []);
+    }, [pulseAnim]);
 
     // Wait for SecureStore hydration before reading persisted state
     if (!_hasHydrated) return null;
@@ -114,7 +114,7 @@ export default function HomeScreen() {
             >
                 {/* Today's Performance */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Today's Performance</Text>
+                    <Text style={styles.sectionTitle}>Today&apos;s Performance</Text>
                     <View style={styles.liveBadge}>
                         <Animated.View
                             style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]}

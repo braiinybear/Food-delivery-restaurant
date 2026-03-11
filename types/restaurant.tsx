@@ -1,0 +1,34 @@
+import { MenuCategory } from "./menu";
+
+export interface Review {
+  id?: string;
+  rating?: number;
+  comment?: string;
+  createdAt?: string;
+}
+export interface Restaurant {
+  id: string;
+  managerId: string;
+  name: string;
+  description: string;
+  logo: string | null;
+  banner: string | null;
+  image: string | null;
+  costForTwo: number;
+  cuisineTypes: string[];
+  address: string;
+  lat: number;
+  lng: number;
+  isActive: boolean;
+  isOpen: boolean;
+  isVerified: boolean;
+  rating: number;
+  ratingCount: number;
+  fssaiCode: string;
+  gstNumber: string;
+  type: string | null;
+  createdAt: string;
+  updatedAt: string;
+  menuCategories: MenuCategory[];
+  reviews: Review[];
+}
