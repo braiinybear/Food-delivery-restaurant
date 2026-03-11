@@ -54,8 +54,6 @@ export default function RootLayout() {
   const isLoggedIn = !isPending && !!session;
   const isLoggedOut = !isPending && !session;
 
-  console.log(isLoggedIn, isLoggedOut);
-
 
   // Show nothing until fonts are ready
   if (!appReady) return null;
@@ -72,7 +70,7 @@ export default function RootLayout() {
     },
   });
 
-  
+
   return (
     <QueryClientProvider client={queryClient}>
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
@@ -105,31 +103,33 @@ export default function RootLayout() {
             />
 
 
-<Stack.Screen
-  name="restaurantForm"
-  options={{
-    headerShown: true,
-    headerTitle: "Become a Partner",
-    headerTintColor: "#fff",
-    headerStyle: {
-      backgroundColor: Colors.primary,
-    },
-    headerTitleAlign: "center",
-    headerTitleStyle: {
-      color: "#fff",
-    },
+            <Stack.Screen
+              name="restaurantForm"
+              options={{
+                headerShown: true,
+                headerTitle: "Become a Partner",
+                headerTintColor: "#fff",
+                headerStyle: {
+                  backgroundColor: Colors.primary,
+                },
+                headerTitleAlign: "center",
+                headerTitleStyle: {
+                  color: "#fff",
+                },
 
-    headerLeft: () => (
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{ marginLeft: 10 }}
-      >
-        <Ionicons name="arrow-back" size={24} color="#fff" />
-      </TouchableOpacity>
-    ),
-  }}
-/>
-            <Stack.Screen name="anu"/>
+                headerLeft: () => (
+                  <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={{ marginLeft: 10 }}
+                  >
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                  </TouchableOpacity>
+                ),
+              }}
+            />
+            <Stack.Screen name="anu" />
+            <Stack.Screen name="menucategory" options={{headerShown:false}} />
+            <Stack.Screen name="menuitem" options={{headerShown:false}} />
           </Stack.Protected>
         </Stack>
       </View>

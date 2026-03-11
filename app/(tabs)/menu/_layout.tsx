@@ -13,7 +13,7 @@ export default function CartRootLayout() {
         <Stack.Screen
             name="index"
             options={{
-                title: "Menu",
+                title: "Menu Management",
             }}
         />
     </Stack>

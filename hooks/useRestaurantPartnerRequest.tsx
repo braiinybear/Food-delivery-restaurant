@@ -6,6 +6,7 @@ import {
     RestaurantPartnerSuccessResponse,
 } from "../types/restaurantRegistration";
 import { useRestaurantLocation } from "./useRestaurantLocation";
+import { Restaurant } from "@/types/restaurant";
 
 export const getMyRestaurantApplication =
     async (): Promise<RestaurantApplicationResponse> => {
@@ -19,6 +20,7 @@ export const useMyRestaurantApplication = () => {
     return useQuery({
         queryKey: ["myRestaurantApplication"],
         queryFn: getMyRestaurantApplication,
+        staleTime: 1000 * 60 * 10,
     });
 };
 export const useSubmitRestaurantPartnerRequest = () => {
@@ -48,4 +50,20 @@ export const useSubmitRestaurantPartnerRequest = () => {
     return useMutation({
         mutationFn: submitRestaurantPartnerRequest,
     });
+};
+
+
+export const getMyRestaurant = async (): Promise<Restaurant> => {
+  const response = await apiClient.get("/api/restaurants/me");
+
+  return response.data as Restaurant;
+};
+
+
+export const useMyRestaurant = () => {
+  return useQuery({
+    queryKey: ["myRestaurant"],
+    queryFn: getMyRestaurant,
+    staleTime: 1000 * 60 * 10,
+  });
 };
