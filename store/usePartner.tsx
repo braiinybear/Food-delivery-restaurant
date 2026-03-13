@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 // Adapter to make expo-secure-store work with Zustand persist
-const secureStorage = {
+export const secureStorage = {
   getItem: async (key: string) => {
     const value = await SecureStore.getItemAsync(key);
     return value ?? null;
@@ -40,4 +40,4 @@ export const usePartnerStore = create<PartnerState>()(
       },
     }
   )
-);
+);

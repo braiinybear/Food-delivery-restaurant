@@ -14,6 +14,7 @@ import {
 import { Colors } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
+import { secureStorage } from "@/store/usePartner";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -54,8 +55,11 @@ export default function SettingsScreen() {
                         try {
                             setSigningOut(true);
                             await authClient.signOut();
+                             await secureStorage.removeItem("partner-store");
                             router.replace("/login");
                         } catch (err) {
+                            console.log(err);
+                            
                             Alert.alert("Error", "Failed to sign out. Please try again.");
                         } finally {
                             setSigningOut(false);

@@ -130,6 +130,18 @@ export default function RootLayout() {
             <Stack.Screen name="anu" />
             <Stack.Screen name="menucategory" options={{headerShown:false}} />
             <Stack.Screen name="menuitem" options={{headerShown:false}} />
+            <Stack.Screen name="restaurantProfile"   options={{
+                headerShown: true,
+                headerTitle: "Restaurant Profile",
+                headerTintColor: "#fff",
+                headerStyle: {
+                  backgroundColor: Colors.primary,
+                },
+                headerTitleAlign: "center",
+                headerTitleStyle: {
+                  color: "#fff",
+                },
+              }} />
           </Stack.Protected>
         </Stack>
       </View>
