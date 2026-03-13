@@ -13,9 +13,7 @@ import {
 } from "react-native";
 import { useSubmitRestaurantPartnerRequest } from "../../hooks/useRestaurantPartnerRequest";
 import { Colors } from "../../constants/colors";
-import { Link, router } from "expo-router";
-import { Button } from "@react-navigation/elements";
-import { authClient } from "@/lib/auth-client";
+import { router } from "expo-router";
 import { usePartnerStore } from "@/store/usePartner";
 
 const CUISINE_OPTIONS = [

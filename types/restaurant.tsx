@@ -32,3 +32,39 @@ export interface Restaurant {
   menuCategories: MenuCategory[];
   reviews: Review[];
 }
+
+export interface UpdateRestaurantRequest{
+  name?:string,
+  description?:string,
+  image?:string,
+  costForTwo?:number,
+  cuisineTypes?:string[],
+  address?:string,
+  lat?:number,
+  lng?:number,
+  fssaiCode?:string,
+  gstNumber?:string,
+}
+
+export interface DeleteRestaurantResponse {
+  message: string;
+}
+
+export interface RestaurantDashboardMetrics {
+  totalOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  activeOrders: number;
+  revenue: number;
+}
+
+export interface RestaurantDashboardPeriod {
+  start: string;
+  end: string;
+}
+
+export interface RestaurantDashboardResponse {
+  restaurantName: string;
+  period: RestaurantDashboardPeriod;
+  metrics: RestaurantDashboardMetrics;
+}

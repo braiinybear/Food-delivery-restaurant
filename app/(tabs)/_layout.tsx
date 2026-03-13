@@ -1,10 +1,24 @@
+import * as NavigationBar from "expo-navigation-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 
 export default function TabsLayout() {
     const insets = useSafeAreaInsets();
+
+    useEffect(() => {
+        if (Platform.OS !== "android") {
+            return;
+        }
+
+        void NavigationBar.setPositionAsync("relative");
+        void NavigationBar.setBackgroundColorAsync("#E5E7EB");
+        void NavigationBar.setBorderColorAsync("#D1D5DB");
+        void NavigationBar.setButtonStyleAsync("dark");
+    }, []);
 
     return (
         <Tabs
