@@ -51,7 +51,7 @@ export default function SplashScreenView({
                 useNativeDriver: true,
             }),
         ]).start(() => onFinish());
-    }, []);
+    }, [logoOpacity, logoScale, onFinish, screenOpacity, taglineOpacity, textOpacity]);
 
     return (
         <Animated.View style={[styles.container, { opacity: screenOpacity }]}>

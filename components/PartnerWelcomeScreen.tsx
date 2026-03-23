@@ -5,7 +5,6 @@ import { authClient } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { usePartnerStore } from "@/store/usePartner";
 
 // ─── Welcome / Partner Onboarding Screen ─────────────────────────────────────
 export function PartnerWelcomeScreen() {

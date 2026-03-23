@@ -85,7 +85,7 @@ export const ApplicationStatusScreen = ({ application, isLoading }: Props) => {
             Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
             Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
         ]).start();
-    }, []);
+    }, [fadeAnim, scaleAnim, slideAnim]);
 
     const status = application?.status ?? "PENDING";
     const cfg = STATUS_CONFIG[status];
