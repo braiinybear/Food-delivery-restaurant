@@ -29,6 +29,8 @@ export const useMenuCategories = (restaurantId: string) => {
 export const createMenuCategory = async (
     body: CreateMenuCategoryRequest
 ): Promise<CreateMenuCategoryResponse> => {
+    console.log(body);
+    
     const response = await apiClient.post(
         "/api/menu-categories",
         body

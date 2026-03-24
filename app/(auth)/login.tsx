@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
         fontFamily: Fonts.brandBold,
     },
     secondaryButton: {
-        backgroundColor: Colors.text,
+        backgroundColor: Colors.primary,
         padding: 16,
         borderRadius: 12,
         flexDirection: "row",

@@ -1,6 +1,6 @@
 import SplashScreenView from "@/components/SplashScreenView";
 import { Colors } from "@/constants/colors";
-
+import * as NavigationBar from "expo-navigation-bar";
 // this is the better-auth authentication.
 import { authClient } from "@/lib/auth-client";
 import {
@@ -18,7 +18,7 @@ import { router, Stack } from "expo-router";
 import * as ExpoSplashScreen from "expo-splash-screen";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 
 // Keep the native splash visible while we load
 ExpoSplashScreen.preventAutoHideAsync();
@@ -49,7 +49,12 @@ export default function RootLayout() {
       setAppReady(true);
     }
   }, [fontsLoaded]);
-
+  // Make Android nav bar buttons dark so they're visible on light backgrounds
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      NavigationBar.setButtonStyleAsync("dark");
+    }
+  }, []);
   // Boolean helpers — make Stack.Protected guards readable
   const isLoggedIn = !isPending && !!session;
   const isLoggedOut = !isPending && !session;

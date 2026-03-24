@@ -23,7 +23,10 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -46,7 +49,14 @@ function CategoryChip({
     return (
         <TouchableOpacity style={styles.chip} onPress={onPress} activeOpacity={0.75}>
             <View style={styles.chipIconWrap}>
-                <Ionicons name="grid-outline" size={16} color={Colors.primary} />
+                {category.image ? (
+                    <Image
+                        source={{ uri: category.image }}
+                        style={styles.chipImage}
+                    />
+                ) : (
+                    <Ionicons name="grid-outline" size={16} color={Colors.primary} />
+                )}
             </View>
             <View>
                 <Text style={styles.chipName} numberOfLines={1}>
@@ -76,6 +86,15 @@ function MenuItemCard({ item }: { item: MenuItem }) {
                     { backgroundColor: item.isAvailable ? Colors.success : Colors.danger },
                 ]}
             />
+
+            {/* Item Thumbnail Image */}
+            {item.image && (
+                <Image
+                    source={{ uri: item.image }}
+                    style={styles.menuItemThumbnail}
+                    resizeMode="cover"
+                />
+            )}
 
             <View style={styles.menuCardBody}>
                 {/* Left info */}
@@ -152,22 +171,135 @@ function AddCategoryModal({
     onClose: () => void;
 }) {
     const [name, setName] = useState("");
+    const [type, setType] = useState("");
+    const [catgoryImage, setCategoryImage] = useState<string | null>(null);
+    const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const { mutate: createCategory, isPending } = useCreateMenuCategory();
+
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ["images"],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+
+                // ─── Validate image before uploading ─────────────────────────────
+                try {
+                    await validateImage(imageUri, 5); // 5MB max
+                } catch (validationError) {
+                    Alert.alert(
+                        "Invalid Image",
+                        validationError instanceof Error
+                            ? validationError.message
+                            : "Please select a valid image",
+                    );
+                    return;
+                }
+
+                // ─── Start cloudinary upload ────────────────────────────────
+                setIsCloudinaryUploading(true);
+                setUploadProgress(0);
+
+                try {
+                    // ─── Simulate progress (0% → 50%) ──────────────────────────
+                    const progressInterval = setInterval(() => {
+                        setUploadProgress((prev) => {
+                            if (prev >= 50) {
+                                clearInterval(progressInterval);
+                                return prev;
+                            }
+                            return prev + Math.random() * 15;
+                        });
+                    }, 200);
+
+                    // ─── Upload to Cloudinary ───────────────────────────────
+                    const response = await uploadImageToCloudinary(imageUri, "menu_categories");
+
+                    clearInterval(progressInterval);
+                    setUploadProgress(100);
+
+                    // ─── Validate response and store the secure URL ─────────────────────────────
+                    if (!response.secure_url) {
+                        throw new Error("No image URL returned from Cloudinary");
+                    }
+
+                    console.log("Cloudinary response:", { url: response.secure_url, folder: response.folder });
+                    setCategoryImage(response.secure_url);
+                    
+                    // ─── Verify image was set ──────────────────────────────
+                    setTimeout(() => {
+                        console.log("Image state after set:", response.secure_url);
+                    }, 100);
+                    setIsCloudinaryUploading(false);
+                    setUploadProgress(0);
+
+                    // ─── Show success message ──────────────────────────────
+                    Alert.alert(
+                        "Success! ✅",
+                        "Category image uploaded to cloud successfully",
+                        [{ text: "OK" }],
+                    );
+                } catch (uploadError) {
+                    Alert.alert(
+                        "Upload Failed ❌",
+                        uploadError instanceof Error
+                            ? uploadError.message
+                            : "Failed to upload image",
+                        [{ text: "Try Again" }],
+                    );
+                } finally {
+                    setIsCloudinaryUploading(false);
+                    setUploadProgress(0);
+                }
+            }
+        } catch (error) {
+            Alert.alert(
+                "Error",
+                error instanceof Error ? error.message : "An error occurred",
+                [{ text: "OK" }],
+            );
+        }
+    };
 
     const handleAdd = () => {
         if (!name.trim()) {
             Alert.alert("Validation", "Category name cannot be empty.");
             return;
         }
+        if (!catgoryImage) {
+            Alert.alert("Validation", "Please upload a category image.");
+            return;
+        }
+
+        console.log("Creating category with:", { name: name.trim(), image: catgoryImage, type: type || undefined });
+
         createCategory(
-            { name: name.trim() },
+            {
+                name: name.trim(),
+                image: catgoryImage,
+                type: type || undefined,
+            },
             {
                 onSuccess: () => {
+                    Alert.alert(
+                        "Success! 🎉",
+                        "Category created successfully",
+                        [{ text: "OK" }]
+                    );
                     setName("");
+                    setType("");
+                    setCategoryImage(null);
                     onClose();
                 },
-                onError: () => {
-                    Alert.alert("Error", "Failed to create category. Please try again.");
+                onError: (error: any) => {
+                    const errorMessage = error?.response?.data?.message || "Failed to create category. Please try again.";
+                    Alert.alert("Error", errorMessage);
                 },
             }
         );
@@ -180,67 +312,181 @@ function AddCategoryModal({
             animationType="fade"
             onRequestClose={onClose}
         >
+            {/* Cloudinary Upload Loading Overlay */}
+            {isCloudinaryUploading && (
+                <View style={styles.uploadingOverlay}>
+                    <View style={styles.uploadingModal}>
+                        <View style={styles.uploadingIcon}>
+                            <Ionicons name="cloud-upload-outline" size={48} color={Colors.primary} />
+                        </View>
+                        <Text style={styles.uploadingTitle}>Uploading to Cloud</Text>
+                        <Text style={styles.uploadingSubtitle}>
+                            Uploading category image...
+                        </Text>
+
+                        {/* Progress Bar */}
+                        <View style={styles.progressBarContainer}>
+                            <View style={styles.progressBarBackground}>
+                                <View
+                                    style={[
+                                        styles.progressBarFill,
+                                        { width: `${Math.min(uploadProgress, 99)}%` },
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.progressPercentage}>
+                                {Math.round(Math.min(uploadProgress, 99))}%
+                            </Text>
+                        </View>
+
+                        {/* Loading Spinner */}
+                        <View style={styles.loadingSpinnerContainer}>
+                            <ActivityIndicator size="large" color={Colors.primary} />
+                        </View>
+
+                        <Text style={styles.uploadingHint}>
+                            This typically takes 5-15 seconds
+                        </Text>
+                    </View>
+                </View>
+            )}
+
             <KeyboardAvoidingView
                 style={styles.modalOverlay}
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
-                <View style={styles.modalCard}>
-                    {/* Handle */}
-                    <View style={styles.modalHandle} />
+                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}>
+                    <View style={styles.modalCard}>
+                        {/* Handle */}
+                        <View style={styles.modalHandle} />
 
-                    <View style={styles.modalHeader}>
-                        <View style={styles.modalIconWrap}>
-                            <Ionicons name="grid" size={22} color={Colors.primary} />
+                        <View style={styles.modalHeader}>
+                            <View style={styles.modalIconWrap}>
+                                <Ionicons name="grid" size={22} color={Colors.primary} />
+                            </View>
+                            <View>
+                                <Text style={styles.modalTitle}>New Category</Text>
+                                <Text style={styles.modalSubtitle}>
+                                    Organise your menu with a new category
+                                </Text>
+                            </View>
                         </View>
-                        <View>
-                            <Text style={styles.modalTitle}>New Category</Text>
-                            <Text style={styles.modalSubtitle}>
-                                Organise your menu with a new category
-                            </Text>
-                        </View>
-                    </View>
 
-                    <Text style={styles.inputLabel}>Category Name</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. Starters, Beverages…"
-                        placeholderTextColor={Colors.muted}
-                        value={name}
-                        onChangeText={setName}
-                        autoFocus
-                        returnKeyType="done"
-                        onSubmitEditing={handleAdd}
-                    />
-
-                    <View style={styles.modalActions}>
+                        {/* Image Upload Section */}
+                        <Text style={styles.inputLabel}>Category Image</Text>
                         <TouchableOpacity
-                            style={styles.cancelButton}
-                            onPress={() => {
-                                setName("");
-                                onClose();
-                            }}
+                            style={[
+                                styles.uploadCard,
+                                catgoryImage && { borderColor: Colors.primary, borderStyle: "solid" },
+                            ]}
+                            onPress={pickImage}
+                            disabled={isCloudinaryUploading}
                             activeOpacity={0.7}
                         >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.addButton, isPending && { opacity: 0.6 }]}
-                            onPress={handleAdd}
-                            disabled={isPending}
-                            activeOpacity={0.8}
-                        >
-                            {isPending ? (
-                                <ActivityIndicator size="small" color={Colors.white} />
-                            ) : (
+                            {catgoryImage ? (
                                 <>
-                                    <Ionicons name="add" size={18} color={Colors.white} />
-                                    <Text style={styles.addButtonText}>Add Category</Text>
+                                    <Image
+                                        source={{ uri: catgoryImage }}
+                                        style={styles.uploadCardImage}
+                                    />
+                                    <View style={styles.uploadCardOverlay}>
+                                        <Ionicons
+                                            name="camera"
+                                            size={24}
+                                            color={Colors.white}
+                                        />
+                                    </View>
                                 </>
+                            ) : (
+                                <View style={styles.uploadCardContent}>
+                                    <View style={styles.uploadCardIcon}>
+                                        <Ionicons
+                                            name="cloud-upload-outline"
+                                            size={28}
+                                            color={Colors.primary}
+                                        />
+                                    </View>
+                                    <View style={styles.uploadCardText}>
+                                        <Text style={styles.uploadCardTitle}>Upload Image</Text>
+                                        <Text style={styles.uploadCardSubtitle}>
+                                            Tap to select from gallery
+                                        </Text>
+                                    </View>
+                                </View>
                             )}
                         </TouchableOpacity>
+
+                        <Text style={styles.inputLabel}>Category Name</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. Starters, Beverages…"
+                            placeholderTextColor={Colors.muted}
+                            value={name}
+                            onChangeText={setName}
+                            returnKeyType="next"
+                            editable={!isCloudinaryUploading}
+                        />
+
+                        <Text style={styles.inputLabel}>Category Type (Optional)</Text>
+                        <View style={styles.typeContainer}>
+                            {["VEG", "NON_VEG", "VEGAN", "DRINKS"].map((categoryType) => (
+                                <TouchableOpacity
+                                    key={categoryType}
+                                    style={[
+                                        styles.typeButton,
+                                        type === categoryType && styles.typeButtonSelected,
+                                    ]}
+                                    onPress={() => setType(categoryType)}
+                                    disabled={isCloudinaryUploading}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.typeButtonText,
+                                            type === categoryType && styles.typeButtonTextSelected,
+                                        ]}
+                                    >
+                                        {categoryType.replace("_", " ")}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setName("");
+                                    setType("");
+                                    setCategoryImage(null);
+                                    onClose();
+                                }}
+                                activeOpacity={0.7}
+                                disabled={isCloudinaryUploading}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.addButton,
+                                    (isPending || isCloudinaryUploading) && { opacity: 0.6 },
+                                ]}
+                                onPress={handleAdd}
+                                disabled={isPending || isCloudinaryUploading}
+                                activeOpacity={0.8}
+                            >
+                                {isPending || isCloudinaryUploading ? (
+                                    <ActivityIndicator size="small" color={Colors.white} />
+                                ) : (
+                                    <>
+                                        <Ionicons name="add" size={18} color={Colors.white} />
+                                        <Text style={styles.addButtonText}>Add Category</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
+                </ScrollView>
             </KeyboardAvoidingView>
         </Modal>
     );
@@ -259,6 +505,7 @@ export default function MenuScreen() {
         isLoading: catLoading,
         isError: catError,
     } = useMenuCategories(restaurantId);
+    
 
     const {
         data: menuItems = [],
@@ -469,12 +716,18 @@ const styles = StyleSheet.create({
         marginRight: 2,
     },
     chipIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+        width: 50,
+        height: 50,
+        borderRadius: 14,
         backgroundColor: Colors.primaryLight,
         justifyContent: "center",
         alignItems: "center",
+        overflow: "hidden",
+    },
+    chipImage: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 10,
     },
     chipName: {
         fontFamily: Fonts.brandBold,
@@ -520,9 +773,15 @@ const styles = StyleSheet.create({
         borderColor: Colors.border,
         flexDirection: "row",
         overflow: "hidden",
+        minHeight: 110,
     },
     availStrip: {
         width: 4,
+    },
+    menuItemThumbnail: {
+        width: 80,
+        height: "100%",
+        backgroundColor: Colors.light,
     },
     menuCardBody: {
         flex: 1,
@@ -586,6 +845,8 @@ const styles = StyleSheet.create({
     menuCardRight: {
         alignItems: "flex-end",
         justifyContent: "space-between",
+        minWidth: 90,
+        gap: 6,
     },
     menuItemPrice: {
         fontFamily: Fonts.brandBlack,
@@ -593,13 +854,16 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     availBadge: {
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        justifyContent: "center",
+        minWidth: 85,
     },
     availBadgeText: {
         fontFamily: Fonts.brandMedium,
-        fontSize: 10,
+        fontSize: FontSize.xs,
+        textAlign: "center",
     },
 
     // Modal
@@ -671,6 +935,196 @@ const styles = StyleSheet.create({
         color: Colors.text,
         backgroundColor: Colors.surface,
         marginBottom: 24,
+    },
+    imageUploadButton: {
+        borderWidth: 2,
+        borderColor: Colors.border,
+        borderRadius: 14,
+        borderStyle: "dashed",
+        height: 160,
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 24,
+        backgroundColor: Colors.surface,
+    },
+    uploadPlaceholder: {
+        alignItems: "center",
+        gap: 8,
+    },
+    uploadedImage: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 12,
+    },
+    uploadText: {
+        fontFamily: Fonts.brandMedium,
+        fontSize: FontSize.sm,
+        color: Colors.primary,
+    },
+    uploadProgressContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        marginBottom: 16,
+        padding: 12,
+        backgroundColor: Colors.primaryLight,
+        borderRadius: 10,
+    },
+    uploadProgressText: {
+        fontFamily: Fonts.brandMedium,
+        fontSize: FontSize.sm,
+        color: Colors.primary,
+    },
+    uploadCard: {
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 24,
+        backgroundColor: Colors.surface,
+        borderStyle: "dashed",
+        overflow: "hidden",
+        minHeight: 100,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadCardContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        flex: 1,
+        width: "100%",
+    },
+    uploadCardImage: {
+        width: "100%",
+        height: 120,
+        borderRadius: 10,
+    },
+    uploadCardOverlay: {
+        position: "absolute",
+        width: "100%",
+        height: 120,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        borderRadius: 10,
+    },
+    uploadCardIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        backgroundColor: Colors.primaryLight,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadCardText: {
+        flex: 1,
+    },
+    uploadCardTitle: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: Colors.text,
+        marginBottom: 2,
+    },
+    uploadCardSubtitle: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+    },
+    uploadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+    },
+    uploadingModal: {
+        backgroundColor: Colors.white,
+        borderRadius: 20,
+        paddingVertical: 40,
+        paddingHorizontal: 30,
+        width: "80%",
+        maxWidth: 320,
+        shadowColor: "#000",
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 10,
+        alignItems: "center",
+    },
+    uploadingIcon: {
+        marginBottom: 16,
+    },
+    uploadingTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: Colors.text,
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    uploadingSubtitle: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+        textAlign: "center",
+        marginBottom: 20,
+        lineHeight: 18,
+    },
+    progressBarContainer: {
+        width: "100%",
+        marginBottom: 16,
+        alignItems: "center",
+        gap: 8,
+    },
+    progressBarBackground: {
+        width: "100%",
+        height: 8,
+        backgroundColor: Colors.light,
+        borderRadius: 4,
+        overflow: "hidden",
+    },
+    progressBarFill: {
+        height: "100%",
+        backgroundColor: Colors.primary,
+    },
+    progressPercentage: {
+        fontWeight: "700",
+        fontSize: 13,
+        color: Colors.primary,
+    },
+    loadingSpinnerContainer: {
+        marginVertical: 16,
+    },
+    uploadingHint: {
+        fontSize: 12,
+        color: Colors.muted,
+        textAlign: "center",
+        marginTop: 12,
+    },
+    typeContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        marginBottom: 24,
+    },
+    typeButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        backgroundColor: Colors.surface,
+    },
+    typeButtonSelected: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    typeButtonText: {
+        fontFamily: Fonts.brandMedium,
+        fontSize: FontSize.sm,
+        color: Colors.text,
+    },
+    typeButtonTextSelected: {
+        color: Colors.white,
     },
     modalActions: {
         flexDirection: "row",

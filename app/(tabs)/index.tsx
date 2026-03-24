@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, Tabs } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePartnerStore } from "@/store/usePartner";
 import {
   ActivityIndicator,
@@ -26,11 +27,12 @@ import { AppUser } from "@/types/user";
 
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { appliedForPartner, _hasHydrated } = usePartnerStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const { data: session } = authClient.useSession();
   const user = session?.user as AppUser | undefined;
-  const { data: application, isLoading: applicationLoading } =
+  const { data: application, isLoading: applicationLoading, refetch: refetchApplication } =
     useMyRestaurantApplication();
   const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } =
     useRestaurantDashboard();
@@ -72,17 +74,44 @@ export default function HomeScreen() {
     return (
       <>
         <Tabs.Screen options={{ tabBarStyle: { display: "none" } }} />
-        <ApplicationStatusScreen
+        <ApplicationStatusScreen 
           application={application}
           isLoading={applicationLoading}
+          onRefresh={async () => {
+            await refetchApplication();
+          }}
         />
       </>
     );
   }
 
+  // Show tabbar for approved home screen
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+    <>
+      <Tabs.Screen
+        options={{
+          tabBarStyle: {
+            backgroundColor: Colors.primary,
+            borderTopWidth: 0,
+            height: 64 + insets.bottom,
+            paddingBottom: 10 + insets.bottom,
+            paddingTop: 6,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+          },
+          tabBarActiveTintColor: Colors.white,
+          tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: "600",
+            letterSpacing: 0.5,
+          },
+        }}
+      />
+     <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -275,7 +304,7 @@ export default function HomeScreen() {
        
       
       </ScrollView>
-    </View>
+    </>
   );
 }
 
@@ -375,7 +404,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 20,
     paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   sectionHeader: {
     flexDirection: "row",

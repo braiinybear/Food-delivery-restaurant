@@ -20,6 +20,7 @@ import { usePartnerStore } from "@/store/usePartner";
 type Props = {
     application: RestaurantApplicationResponse | undefined;
     isLoading: boolean;
+    onRefresh?: () => Promise<void>;
 };
 
 const STATUS_CONFIG = {
@@ -72,12 +73,15 @@ const STATUS_CONFIG = {
     },
 } as const;
 
-export const ApplicationStatusScreen = ({ application, isLoading }: Props) => {
+export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: Props) => {
     const insets = useSafeAreaInsets();
     const { setAppliedForPartner } = usePartnerStore();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
+    const rotateAnim = useRef(new Animated.Value(0)).current;
+    const rotationRef = useRef<any>(null);
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
 
     useEffect(() => {
         Animated.parallel([
@@ -86,6 +90,39 @@ export const ApplicationStatusScreen = ({ application, isLoading }: Props) => {
             Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
         ]).start();
     }, [fadeAnim, scaleAnim, slideAnim]);
+
+    useEffect(() => {
+        if (isRefreshing) {
+            rotateAnim.setValue(0);
+            rotationRef.current = Animated.loop(
+                Animated.timing(rotateAnim, {
+                    toValue: 1,
+                    duration: 1000,
+                    useNativeDriver: true,
+                })
+            );
+            rotationRef.current.start();
+        } else {
+            if (rotationRef.current) {
+                rotationRef.current.stop();
+                rotationRef.current = null;
+            }
+            rotateAnim.setValue(0);
+        }
+    }, [isRefreshing, rotateAnim]);
+
+    const handleRefresh = async () => {
+        try {
+            setIsRefreshing(true);
+            if (onRefresh) {
+                await onRefresh();
+            }
+        } catch (error) {
+            console.error("Failed to refresh application status:", error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const status = application?.status ?? "PENDING";
     const cfg = STATUS_CONFIG[status];
@@ -109,14 +146,29 @@ export const ApplicationStatusScreen = ({ application, isLoading }: Props) => {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Application Status</Text>
                 <TouchableOpacity
-                    style={styles.logoutBtn}
-                    onPress={() => {
-                        authClient.signOut();
-                        setAppliedForPartner(false);
-                    }}
+                    style={[styles.refreshBtn, isRefreshing && styles.refreshBtnLoading]}
+                    onPress={handleRefresh}
+                    disabled={isRefreshing}
                     activeOpacity={0.75}
                 >
-                    <Ionicons name="log-out-outline" size={20} color={Colors.muted} />
+                    <Animated.View
+                        style={{
+                            transform: [
+                                {
+                                    rotate: rotateAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ["0deg", "360deg"],
+                                    }),
+                                },
+                            ],
+                        }}
+                    >
+                        <Ionicons 
+                            name="refresh-outline" 
+                            size={20} 
+                            color={isRefreshing ? Colors.primary : Colors.muted}
+                        />
+                    </Animated.View>
                 </TouchableOpacity>
             </View>
 
@@ -270,7 +322,7 @@ const styles = StyleSheet.create({
         fontSize: FontSize.lg,
         color: Colors.text,
     },
-    logoutBtn: {
+    refreshBtn: {
         width: 38,
         height: 38,
         borderRadius: 19,
@@ -279,6 +331,9 @@ const styles = StyleSheet.create({
         borderColor: Colors.border,
         justifyContent: "center",
         alignItems: "center",
+    },
+    refreshBtnLoading: {
+        opacity: 0.7,
     },
     scroll: {
         padding: 20,

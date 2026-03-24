@@ -23,7 +23,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 
 // ─── Type badge colours ───────────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, string> = {
@@ -45,6 +48,15 @@ function CategoryItemRow({ item }: { item: MenuItem }) {
     >
       {/* Color strip */}
       <View style={[styles.itemStrip, { backgroundColor: typeColor + "55" }]} />
+
+      {/* Item Image Thumbnail */}
+      {item.image && (
+        <Image
+          source={{ uri: item.image }}
+          style={styles.itemThumbnail}
+          resizeMode="cover"
+        />
+      )}
 
       <View style={styles.itemRowBody}>
         <View style={styles.itemRowLeft}>
@@ -81,32 +93,148 @@ function CategoryItemRow({ item }: { item: MenuItem }) {
 function EditCategoryModal({
   visible,
   currentName,
+  currentType,
   categoryId,
+  categoryImage,
   onClose,
 }: {
   visible: boolean;
   currentName: string;
+  currentType?: string;
   categoryId: string;
+  categoryImage?: string;
   onClose: () => void;
 }) {
   const [name, setName] = useState(currentName);
+  const [type, setType] = useState(currentType ?? "");
+  const [categoryImg, setCategoryImage] = useState<string | null>(categoryImage ?? null);
+  const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { mutate: updateCategory, isPending } = useUpdateMenuCategory();
 
   useEffect(() => {
-    if (visible) setName(currentName);
-  }, [visible, currentName]);
+    if (visible) {
+      setName(currentName);
+      setType(currentType ?? "");
+      setCategoryImage(categoryImage ?? null);
+    }
+  }, [visible, currentName, currentType, categoryImage]);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+
+        // ─── Validate image before uploading ─────────────────────────────
+        try {
+          await validateImage(imageUri, 5); // 5MB max
+        } catch (validationError) {
+          Alert.alert(
+            "Invalid Image",
+            validationError instanceof Error
+              ? validationError.message
+              : "Please select a valid image",
+          );
+          return;
+        }
+
+        // ─── Start cloudinary upload ────────────────────────────────
+        setIsCloudinaryUploading(true);
+        setUploadProgress(0);
+
+        try {
+          // ─── Simulate progress (0% → 50%) ──────────────────────────
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => {
+              if (prev >= 50) {
+                clearInterval(progressInterval);
+                return prev;
+              }
+              return prev + Math.random() * 15;
+            });
+          }, 200);
+
+          // ─── Upload to Cloudinary ───────────────────────────────
+          const response = await uploadImageToCloudinary(imageUri, "menu_categories");
+
+          clearInterval(progressInterval);
+          setUploadProgress(100);
+
+          // ─── Validate response and store the secure URL ─────────────────────────────
+          if (!response.secure_url) {
+            throw new Error("No image URL returned from Cloudinary");
+          }
+
+          setCategoryImage(response.secure_url);
+          setIsCloudinaryUploading(false);
+          setUploadProgress(0);
+
+          // ─── Show success message ──────────────────────────────
+          Alert.alert(
+            "Success! ✅",
+            "Category image updated successfully",
+            [{ text: "OK" }],
+          );
+        } catch (uploadError) {
+          Alert.alert(
+            "Upload Failed ❌",
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Failed to upload image",
+            [{ text: "Try Again" }],
+          );
+        } finally {
+          setIsCloudinaryUploading(false);
+          setUploadProgress(0);
+        }
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "An error occurred",
+        [{ text: "OK" }],
+      );
+    }
+  };
 
   const handleSave = () => {
     if (!name.trim()) {
       Alert.alert("Validation", "Category name cannot be empty.");
       return;
     }
+    
+    const updateBody: any = {
+      name: name.trim(),
+    };
+    
+    // Only include image if it has a valid URL
+    if (categoryImg && categoryImg.trim()) {
+      updateBody.image = categoryImg;
+    }
+
+    // Only include type if it's selected
+    if (type && type.trim()) {
+      updateBody.type = type;
+    }
+    
     updateCategory(
-      { id: categoryId, body: { name: name.trim() } },
+      { id: categoryId, body: updateBody },
       {
-        onSuccess: () => onClose(),
-        onError: () =>
-          Alert.alert("Error", "Failed to update category. Please try again."),
+        onSuccess: () => {
+          Alert.alert("Success! ✅", "Category updated successfully");
+          onClose();
+        },
+        onError: (error: any) => {
+          const errorMessage = error?.response?.data?.message || "Failed to update category. Please try again.";
+          Alert.alert("Error", errorMessage);
+        },
       },
     );
   };
@@ -118,65 +246,172 @@ function EditCategoryModal({
       animationType="fade"
       onRequestClose={onClose}
     >
+      {/* Cloudinary Upload Loading Overlay */}
+      {isCloudinaryUploading && (
+        <View style={styles.uploadingOverlay}>
+          <View style={styles.uploadingModal}>
+            <View style={styles.uploadingIcon}>
+              <Ionicons name="cloud-upload-outline" size={48} color={Colors.primary} />
+            </View>
+            <Text style={styles.uploadingTitle}>Uploading to Cloud</Text>
+            <Text style={styles.uploadingSubtitle}>
+              Updating category image...
+            </Text>
+
+            {/* Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(uploadProgress, 99)}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressPercentage}>
+                {Math.round(Math.min(uploadProgress, 99))}%
+              </Text>
+            </View>
+
+            {/* Loading Spinner */}
+            <View style={styles.loadingSpinnerContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+
+            <Text style={styles.uploadingHint}>
+              This typically takes 5-15 seconds
+            </Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={styles.modalOverlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.modalCard}>
-          <View style={styles.modalHandle} />
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 20 }}>
+          <View style={styles.editModalCard}>
+            <View style={styles.modalHandle} />
 
-          <View style={styles.modalHeader}>
-            <View style={styles.modalIconWrap}>
-              <Ionicons
-                name="create-outline"
-                size={22}
-                color={Colors.primary}
-              />
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconWrap}>
+                <Ionicons
+                  name="create-outline"
+                  size={22}
+                  color={Colors.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Edit Category</Text>
+                <Text style={styles.modalSubtitle}>
+                  Update this menu category
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.modalTitle}>Edit Category</Text>
-              <Text style={styles.modalSubtitle}>
-                Rename this menu category
-              </Text>
-            </View>
-          </View>
 
-          <Text style={styles.inputLabel}>Category Name</Text>
-          <TextInput
-            style={styles.textInput}
-            value={name}
-            onChangeText={setName}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={handleSave}
-            placeholderTextColor={Colors.muted}
-          />
-
-          <View style={styles.modalActions}>
+            {/* Image Upload Section - Smaller */}
+            <Text style={styles.inputLabel}>Category Image</Text>
             <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
+              style={[
+                styles.smallUploadCard,
+                categoryImg && { borderColor: Colors.primary, borderStyle: "solid" },
+              ]}
+              onPress={pickImage}
+              disabled={isCloudinaryUploading}
               activeOpacity={0.7}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.primaryButton, isPending && { opacity: 0.6 }]}
-              onPress={handleSave}
-              disabled={isPending}
-              activeOpacity={0.8}
-            >
-              {isPending ? (
-                <ActivityIndicator size="small" color={Colors.white} />
-              ) : (
+              {categoryImg ? (
                 <>
-                  <Ionicons name="checkmark" size={18} color={Colors.white} />
-                  <Text style={styles.primaryButtonText}>Save Changes</Text>
+                  <Image
+                    source={{ uri: categoryImg }}
+                    style={styles.uploadCardImage}
+                  />
+                  <View style={styles.uploadCardOverlay}>
+                    <Ionicons
+                      name="camera"
+                      size={20}
+                      color={Colors.white}
+                    />
+                  </View>
                 </>
+              ) : (
+                <View style={styles.uploadCardContent}>
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={24}
+                    color={Colors.primary}
+                  />
+                </View>
               )}
             </TouchableOpacity>
+
+            <Text style={styles.inputLabel}>Category Name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={name}
+              onChangeText={setName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
+              placeholderTextColor={Colors.muted}
+              editable={!isCloudinaryUploading}
+            />
+
+            <Text style={styles.inputLabel}>Category Type (Optional)</Text>
+            <View style={styles.createModalPillGroup}>
+              {["VEG", "NON_VEG", "VEGAN", "DRINKS"].map((categoryType) => (
+                <TouchableOpacity
+                  key={categoryType}
+                  style={[
+                    styles.createModalPill,
+                    type === categoryType && {
+                      backgroundColor: Colors.primary,
+                      borderColor: Colors.primary,
+                    },
+                  ]}
+                  onPress={() => setType(categoryType)}
+                  disabled={isCloudinaryUploading}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.createModalPillText,
+                      type === categoryType && { color: Colors.white },
+                    ]}
+                  >
+                    {categoryType.replace("_", " ")}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={onClose}
+                activeOpacity={0.7}
+                disabled={isCloudinaryUploading}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryButton, (isPending || isCloudinaryUploading) && { opacity: 0.6 }]}
+                onPress={handleSave}
+                disabled={isPending || isCloudinaryUploading}
+                activeOpacity={0.8}
+              >
+                {isPending || isCloudinaryUploading ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={18} color={Colors.white} />
+                    <Text style={styles.primaryButtonText}>Save Changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -191,6 +426,8 @@ function CreateMenuItemModal({
   onClose: () => void;
 }) {
   const { mutate: createItem, isPending } = useCreateMenuItem();
+  const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -205,6 +442,87 @@ function CreateMenuItemModal({
 
   const updateField = (key: string, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+
+        // ─── Validate image before uploading ─────────────────────────────
+        try {
+          await validateImage(imageUri, 5); // 5MB max
+        } catch (validationError) {
+          Alert.alert(
+            "Invalid Image",
+            validationError instanceof Error
+              ? validationError.message
+              : "Please select a valid image",
+          );
+          return;
+        }
+
+        // ─── Start cloudinary upload ────────────────────────────────
+        setIsCloudinaryUploading(true);
+        setUploadProgress(0);
+
+        try {
+          // ─── Simulate progress (0% → 50%) ──────────────────────────
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => {
+              const next = prev + Math.random() * 40;
+              return next > 50 ? 50 : next;
+            });
+          }, 200);
+
+          // ─── Upload to Cloudinary ───────────────────────────────
+          const response = await uploadImageToCloudinary(imageUri, "menu_items");
+
+          clearInterval(progressInterval);
+          setUploadProgress(100);
+
+          // ─── Validate response and store the secure URL ─────────────────────────────
+          if (!response.secure_url) {
+            throw new Error("No image URL returned from Cloudinary");
+          }
+
+          updateField("image", response.secure_url);
+          setIsCloudinaryUploading(false);
+          setUploadProgress(0);
+
+          // ─── Show success message ──────────────────────────────
+          Alert.alert(
+            "Success! ✅",
+            "Menu item image uploaded successfully",
+            [{ text: "OK" }],
+          );
+        } catch (uploadError) {
+          Alert.alert(
+            "Upload Failed ❌",
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Failed to upload image",
+            [{ text: "Try Again" }],
+          );
+        } finally {
+          setIsCloudinaryUploading(false);
+          setUploadProgress(0);
+        }
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "An error occurred",
+        [{ text: "OK" }],
+      );
+    }
   };
 
   const handleSubmit = () => {
@@ -266,6 +584,43 @@ function CreateMenuItemModal({
       animationType="slide"
       onRequestClose={onClose}
     >
+      {/* Cloudinary Upload Loading Overlay */}
+      {isCloudinaryUploading && (
+        <View style={styles.uploadingOverlay}>
+          <View style={styles.uploadingModal}>
+            <View style={styles.uploadingIcon}>
+              <Ionicons name="cloud-upload-outline" size={48} color={Colors.primary} />
+            </View>
+            <Text style={styles.uploadingTitle}>Uploading to Cloud</Text>
+            <Text style={styles.uploadingSubtitle}>
+              Updating menu item image...
+            </Text>
+
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${uploadProgress}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressPercentage}>
+                {Math.round(uploadProgress)}%
+              </Text>
+            </View>
+
+            <View style={styles.loadingSpinnerContainer}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+
+            <Text style={styles.uploadingHint}>
+              This typically takes 5-15 seconds
+            </Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={styles.createModalOverlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -342,17 +697,45 @@ function CreateMenuItemModal({
               </View>
             </View>
 
-            {/* Image URL */}
-            <Text style={styles.inputLabel}>Image URL</Text>
-            <TextInput
-              placeholder="https://example.com/photo.jpg"
-              placeholderTextColor={Colors.muted}
-              style={styles.textInput}
-              value={form.image}
-              onChangeText={(v) => updateField("image", v)}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
+            {/* Image Upload Card */}
+            <Text style={styles.inputLabel}>Menu Item Image</Text>
+            <TouchableOpacity 
+              style={styles.uploadCard}
+              onPress={pickImage}
+              disabled={isCloudinaryUploading}
+              activeOpacity={0.8}
+            >
+              {form.image ? (
+                <>
+                  <Image
+                    source={{ uri: form.image }}
+                    style={styles.uploadCardImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.uploadCardOverlay}>
+                    <View style={styles.uploadCardContent}>
+                      <View style={styles.uploadCardIcon}>
+                        <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
+                      </View>
+                      <View style={styles.uploadCardText}>
+                        <Text style={styles.uploadCardTitle}>Tap to Change</Text>
+                        <Text style={styles.uploadCardSubtitle}>Select a different image</Text>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.uploadCardContent}>
+                  <View style={styles.uploadCardIcon}>
+                    <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
+                  </View>
+                  <View style={styles.uploadCardText}>
+                    <Text style={styles.uploadCardTitle}>Upload Image</Text>
+                    <Text style={styles.uploadCardSubtitle}>Tap to select from device</Text>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
 
             {/* Type pills */}
             <Text style={styles.inputLabel}>Type</Text>
@@ -599,6 +982,16 @@ export default function MenuCategoryDetailScreen() {
         </View>
       </View>
 
+      {/* ── Category Image Showcase ── */}
+      {category.image && (
+        <View style={styles.imageShowcase}>
+          <Image
+            source={{ uri: category.image }}
+            style={styles.showcaseImage}
+          />
+        </View>
+      )}
+
       {/* ── Items list ── */}
       <ScrollView
         style={styles.scroll}
@@ -632,6 +1025,7 @@ export default function MenuCategoryDetailScreen() {
         visible={editModalVisible}
         currentName={category.name}
         categoryId={id ?? ""}
+        categoryImage={category.image}
         onClose={() => setEditModalVisible(false)}
       />
       <CreateMenuItemModal
@@ -732,6 +1126,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
   },
 
+  // Category Image Showcase
+  imageShowcase: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: Colors.background,
+  },
+  showcaseImage: {
+    width: "100%",
+    height: 220,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+  },
+
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
@@ -758,6 +1165,11 @@ const styles = StyleSheet.create({
   },
   itemStrip: {
     width: 4,
+  },
+  itemThumbnail: {
+    width: 80,
+    height: 80,
+    backgroundColor: Colors.light,
   },
   itemRowBody: {
     flex: 1,
@@ -811,6 +1223,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+  },
+  editModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 24,
+    width: "100%",
+    maxHeight: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
   },
   modalCard: {
     backgroundColor: Colors.white,
@@ -976,7 +1400,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: "88%",
+    paddingBottom: 32,
+    maxHeight: "92%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
@@ -984,7 +1409,8 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   createModalScroll: {
-    marginBottom: 16,
+    marginBottom: 0,
+    paddingBottom: 16,
   },
   createModalRow: {
     flexDirection: "row",
@@ -1037,4 +1463,156 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Upload Card
+  uploadCard: {
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+    borderRadius: 16,
+    padding: 0,
+    overflow: "hidden",
+    marginBottom: 16,
+    minHeight: 120,
+    maxHeight: 160,
+    backgroundColor: Colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  smallUploadCard: {
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+    borderRadius: 14,
+    padding: 0,
+    overflow: "hidden",
+    marginBottom: 20,
+    height: 100,
+    width: 100,
+    backgroundColor: Colors.surface,
+    alignSelf: "center",
+  },
+  uploadCardImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  uploadCardOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadCardContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  uploadCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadCardText: {
+    alignItems: "center",
+    gap: 4,
+  },
+  uploadCardTitle: {
+    fontFamily: Fonts.brandBold,
+    fontSize: FontSize.md,
+    color: Colors.text,
+  },
+  uploadCardSubtitle: {
+    fontFamily: Fonts.brand,
+    fontSize: FontSize.sm,
+    color: Colors.muted,
+  },
+
+  // Uploading Overlay
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  uploadingModal: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center",
+    width: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  uploadingIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  uploadingTitle: {
+    fontFamily: Fonts.brandBold,
+    fontSize: FontSize.lg,
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  uploadingSubtitle: {
+    fontFamily: Fonts.brand,
+    fontSize: FontSize.sm,
+    color: Colors.muted,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  progressBarContainer: {
+    width: "100%",
+    marginBottom: 16,
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.border,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    fontFamily: Fonts.brandBold,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    textAlign: "center",
+  },
+  loadingSpinnerContainer: {
+    marginBottom: 16,
+  },
+  uploadingHint: {
+    fontFamily: Fonts.brand,
+    fontSize: FontSize.xs,
+    color: Colors.muted,
+    textAlign: "center",
+  },
 });
+

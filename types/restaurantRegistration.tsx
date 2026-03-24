@@ -8,6 +8,9 @@ export interface RestaurantPartnerRequestBody {
     costForTwo: number;
     fssaiCode: string;
     gstNumber: string;
+    logoUrl: string;
+    bannerUrl: string;
+    fssaiDocUrl: string;
 }
 
 export interface RestaurantPartnerSuccessResponse {

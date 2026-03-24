@@ -40,7 +40,7 @@ export const useSubmitRestaurantPartnerRequest = () => {
       "/api/partner-requests/restaurant",
       payload,
     );
-    console.log(response.data);
+    
 
     return response.data;
   };

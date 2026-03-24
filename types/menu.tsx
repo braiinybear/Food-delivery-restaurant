@@ -18,6 +18,7 @@ export interface MenuCategory {
   id: string;
   name: string;
   restaurantId: string;
+  image:string;
   type: string | null;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,9 @@ export interface MenuCategory {
 
 export interface CreateMenuCategoryRequest {
   name: string;
+  image: string;
+  type?: string;
+
 }
 
 export interface CreateMenuCategoryResponse {
@@ -41,6 +45,8 @@ export interface CreateMenuCategoryResponse {
 
 export interface UpdateMenuCategoryRequest {
   name: string;
+  image: string;
+  type?: string;
 }
 
 export interface DeleteMenuCategoryResponse {

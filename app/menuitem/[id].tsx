@@ -14,6 +14,7 @@ import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -25,6 +26,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -129,6 +132,9 @@ export default function MenuItemDetailScreen() {
     const [isAvailable, setIsAvailable] = useState(true);
     const [categoryId, setCategoryId] = useState("");
     const [isDirty, setIsDirty] = useState(false);
+    const [image, setImage] = useState<string | null>(null);
+    const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     // Populate from API data
     useEffect(() => {
@@ -142,12 +148,95 @@ export default function MenuItemDetailScreen() {
             setIsBestseller(item.isBestseller ?? false);
             setIsAvailable(item.isAvailable ?? true);
             setCategoryId(item.categoryId ?? "");
+            setImage(item.image ?? null);
         }
     }, [item]);
 
     const markDirty = (setter: (v: any) => void) => (v: any) => {
         setter(v);
         setIsDirty(true);
+    };
+
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ["images"],
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+
+                // ─── Validate image before uploading ─────────────────────────────
+                try {
+                    await validateImage(imageUri, 5); // 5MB max
+                } catch (validationError) {
+                    Alert.alert(
+                        "Invalid Image",
+                        validationError instanceof Error
+                            ? validationError.message
+                            : "Please select a valid image",
+                    );
+                    return;
+                }
+
+                // ─── Start cloudinary upload ────────────────────────────────
+                setIsCloudinaryUploading(true);
+                setUploadProgress(0);
+
+                try {
+                    // ─── Simulate progress (0% → 50%) ──────────────────────────
+                    const progressInterval = setInterval(() => {
+                        setUploadProgress((prev) => {
+                            const next = prev + Math.random() * 40;
+                            return next > 50 ? 50 : next;
+                        });
+                    }, 200);
+
+                    // ─── Upload to Cloudinary ───────────────────────────────
+                    const response = await uploadImageToCloudinary(imageUri, "menu_items");
+
+                    clearInterval(progressInterval);
+                    setUploadProgress(100);
+
+                    // ─── Validate response and store the secure URL ─────────────────────────────
+                    if (!response.secure_url) {
+                        throw new Error("No image URL returned from Cloudinary");
+                    }
+
+                    setImage(response.secure_url);
+                    setIsDirty(true);
+                    setIsCloudinaryUploading(false);
+                    setUploadProgress(0);
+
+                    // ─── Show success message ──────────────────────────────
+                    Alert.alert(
+                        "Success! ✅",
+                        "Menu item image uploaded successfully",
+                        [{ text: "OK" }],
+                    );
+                } catch (uploadError) {
+                    Alert.alert(
+                        "Upload Failed ❌",
+                        uploadError instanceof Error
+                            ? uploadError.message
+                            : "Failed to upload image",
+                        [{ text: "Try Again" }],
+                    );
+                } finally {
+                    setIsCloudinaryUploading(false);
+                    setUploadProgress(0);
+                }
+            }
+        } catch (error) {
+            Alert.alert(
+                "Error",
+                error instanceof Error ? error.message : "An error occurred",
+                [{ text: "OK" }],
+            );
+        }
     };
 
     const handleSave = () => {
@@ -170,6 +259,7 @@ export default function MenuItemDetailScreen() {
             spiceLevel,
             isBestseller,
             categoryId: categoryId || undefined,
+            image: image || undefined,
         };
 
         updateItem(
@@ -323,6 +413,43 @@ export default function MenuItemDetailScreen() {
                 style={{ flex: 1 }}
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
             >
+                {/* Cloudinary Upload Loading Overlay */}
+                {isCloudinaryUploading && (
+                    <View style={styles.uploadingOverlay}>
+                        <View style={styles.uploadingModal}>
+                            <View style={styles.uploadingIcon}>
+                                <Ionicons name="cloud-upload-outline" size={48} color={Colors.primary} />
+                            </View>
+                            <Text style={styles.uploadingTitle}>Uploading to Cloud</Text>
+                            <Text style={styles.uploadingSubtitle}>
+                                Updating menu item image...
+                            </Text>
+
+                            <View style={styles.progressBarContainer}>
+                                <View style={styles.progressBarBackground}>
+                                    <View
+                                        style={[
+                                            styles.progressBarFill,
+                                            { width: `${uploadProgress}%` },
+                                        ]}
+                                    />
+                                </View>
+                                <Text style={styles.progressPercentage}>
+                                    {Math.round(uploadProgress)}%
+                                </Text>
+                            </View>
+
+                            <View style={styles.loadingSpinnerContainer}>
+                                <ActivityIndicator size="large" color={Colors.primary} />
+                            </View>
+
+                            <Text style={styles.uploadingHint}>
+                                This typically takes 5-15 seconds
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 <ScrollView
                     style={styles.scroll}
                     showsVerticalScrollIndicator={false}
@@ -368,6 +495,62 @@ export default function MenuItemDetailScreen() {
                                 thumbColor={isAvailable ? Colors.success : Colors.muted}
                             />
                         </View>
+                    </SectionCard>
+
+                    {/* Image Upload Section */}
+                    <SectionCard title="ITEM IMAGE">
+                        <TouchableOpacity 
+                            style={styles.uploadCard}
+                            onPress={pickImage}
+                            disabled={isCloudinaryUploading}
+                            activeOpacity={0.8}
+                        >
+                            {image ? (
+                                <>
+                                    <Image
+                                        source={{ uri: image }}
+                                        style={styles.uploadCardImage}
+                                        resizeMode="cover"
+                                    />
+                                    <View style={styles.uploadCardOverlay}>
+                                        <View style={styles.uploadCardContent}>
+                                            <View style={styles.uploadCardIcon}>
+                                                <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
+                                            </View>
+                                            <View style={styles.uploadCardText}>
+                                                <Text style={styles.uploadCardTitle}>Tap to Change</Text>
+                                                <Text style={styles.uploadCardSubtitle}>Select a different image</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </>
+                            ) : (
+                                <View style={styles.uploadCardContent}>
+                                    <View style={styles.uploadCardIcon}>
+                                        <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
+                                    </View>
+                                    <View style={styles.uploadCardText}>
+                                        <Text style={styles.uploadCardTitle}>Upload Image</Text>
+                                        <Text style={styles.uploadCardSubtitle}>Tap to select from device</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        {isCloudinaryUploading && (
+                            <View style={styles.uploadingProgressContainer}>
+                                <View style={styles.uploadingProgressBackground}>
+                                    <View
+                                        style={[
+                                            styles.uploadingProgressFill,
+                                            { width: `${uploadProgress}%` },
+                                        ]}
+                                    />
+                                </View>
+                                <Text style={styles.uploadingProgressText}>
+                                    {Math.round(uploadProgress)}%
+                                </Text>
+                            </View>
+                        )}
                     </SectionCard>
 
                     {/* Basic Info */}
@@ -679,7 +862,7 @@ const styles = StyleSheet.create({
 
     // Scroll
     scroll: { flex: 1 },
-    scrollContent: { paddingTop: 16, paddingBottom: 40, gap: 12, paddingHorizontal: 16 },
+    scrollContent: { paddingTop: 16, paddingBottom: 60, gap: 12, paddingHorizontal: 16 },
 
     // Section card
     sectionCard: {
@@ -895,5 +1078,164 @@ const styles = StyleSheet.create({
         fontFamily: Fonts.brandBold,
         fontSize: FontSize.md,
         color: Colors.white,
+    },
+
+    // Upload Card
+    uploadCard: {
+        borderWidth: 2,
+        borderColor: Colors.border,
+        borderStyle: "dashed",
+        borderRadius: 16,
+        padding: 0,
+        overflow: "hidden",
+        marginBottom: 12,
+        minHeight: 120,
+        maxHeight: 160,
+        backgroundColor: Colors.surface,
+    },
+    uploadCardImage: {
+        width: "100%",
+        height: "100%",
+    },
+    uploadCardOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadCardContent: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 12,
+    },
+    uploadCardIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: Colors.primaryLight,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    uploadCardText: {
+        alignItems: "center",
+        gap: 4,
+    },
+    uploadCardTitle: {
+        fontFamily: Fonts.brandBold,
+        fontSize: FontSize.md,
+        color: Colors.text,
+    },
+    uploadCardSubtitle: {
+        fontFamily: Fonts.brand,
+        fontSize: FontSize.sm,
+        color: Colors.muted,
+    },
+
+    // Upload Progress (within form)
+    uploadingProgressContainer: {
+        marginTop: 12,
+    },
+    uploadingProgressBackground: {
+        width: "100%",
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.border,
+        overflow: "hidden",
+        marginBottom: 8,
+    },
+    uploadingProgressFill: {
+        height: "100%",
+        backgroundColor: Colors.primary,
+        borderRadius: 4,
+    },
+    uploadingProgressText: {
+        fontFamily: Fonts.brandBold,
+        fontSize: FontSize.xs,
+        color: Colors.text,
+        textAlign: "center",
+    },
+
+    // Uploading Overlay
+    uploadingOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+    },
+    uploadingModal: {
+        backgroundColor: Colors.white,
+        borderRadius: 24,
+        padding: 32,
+        alignItems: "center",
+        width: "80%",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 16,
+    },
+    uploadingIcon: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: Colors.primaryLight,
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    uploadingTitle: {
+        fontFamily: Fonts.brandBold,
+        fontSize: FontSize.lg,
+        color: Colors.text,
+        marginBottom: 4,
+    },
+    uploadingSubtitle: {
+        fontFamily: Fonts.brand,
+        fontSize: FontSize.sm,
+        color: Colors.muted,
+        marginBottom: 24,
+        textAlign: "center",
+    },
+    progressBarContainer: {
+        width: "100%",
+        marginBottom: 16,
+    },
+    progressBarBackground: {
+        width: "100%",
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.border,
+        overflow: "hidden",
+        marginBottom: 8,
+    },
+    progressBarFill: {
+        height: "100%",
+        backgroundColor: Colors.primary,
+        borderRadius: 4,
+    },
+    progressPercentage: {
+        fontFamily: Fonts.brandBold,
+        fontSize: FontSize.sm,
+        color: Colors.text,
+        textAlign: "center",
+    },
+    loadingSpinnerContainer: {
+        marginBottom: 16,
+    },
+    uploadingHint: {
+        fontFamily: Fonts.brand,
+        fontSize: FontSize.xs,
+        color: Colors.muted,
+        textAlign: "center",
     },
 });
