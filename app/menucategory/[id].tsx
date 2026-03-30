@@ -580,7 +580,7 @@ function CreateMenuItemModal({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false}
       animationType="slide"
       onRequestClose={onClose}
     >
@@ -622,14 +622,9 @@ function CreateMenuItemModal({
       )}
 
       <KeyboardAvoidingView
-        style={styles.createModalOverlay}
+        style={styles.createModalOverlayFull}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          activeOpacity={1}
-          onPress={onClose}
-        />
         <View style={styles.createModalCard}>
           <View style={styles.modalHandle} />
 
@@ -700,7 +695,10 @@ function CreateMenuItemModal({
             {/* Image Upload Card */}
             <Text style={styles.inputLabel}>Menu Item Image</Text>
             <TouchableOpacity 
-              style={styles.uploadCard}
+             style={[
+    styles.uploadCard,
+    form.image && styles.uploadCardActive
+  ]}
               onPress={pickImage}
               disabled={isCloudinaryUploading}
               activeOpacity={0.8}
@@ -1397,11 +1395,12 @@ const styles = StyleSheet.create({
   },
   createModalCard: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     padding: 24,
     paddingBottom: 32,
-    maxHeight: "92%",
+    flex: 1,
+    maxHeight: "100%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
@@ -1411,6 +1410,11 @@ const styles = StyleSheet.create({
   createModalScroll: {
     marginBottom: 0,
     paddingBottom: 16,
+  },
+
+  createModalOverlayFull: {
+    flex: 1,
+    backgroundColor: Colors.white,
   },
   createModalRow: {
     flexDirection: "row",
@@ -1470,11 +1474,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderStyle: "dashed",
     borderRadius: 16,
-    padding: 0,
+    padding: 16,
     overflow: "hidden",
-    marginBottom: 16,
-    minHeight: 120,
-    maxHeight: 160,
+    marginBottom: 20,
+    minHeight: 180,
+    maxHeight: 220,
     backgroundColor: Colors.surface,
     justifyContent: "center",
     alignItems: "center",
@@ -1496,6 +1500,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+    borderRadius: 16,
   },
   uploadCardOverlay: {
     position: "absolute",
@@ -1503,7 +1508,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.16)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1614,5 +1619,11 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     textAlign: "center",
   },
+  uploadCardActive: {
+  borderWidth: 0,
+  backgroundColor: "transparent",
+  padding: 0,
+  borderStyle: "solid",
+},
 });
 

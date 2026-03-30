@@ -8,7 +8,9 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-
+google-services.json
+/ios
+/android
 # Native
 .kotlin/
 *.orig.*
@@ -17,7 +19,7 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
-
+food-delivery-customer-de54a-firebase-adminsdk-fbsvc-ed20b9ebd8.json
 # Metro
 .metro-health-check*
 

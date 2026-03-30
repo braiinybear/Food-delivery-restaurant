@@ -1,14 +1,26 @@
 import * as NavigationBar from "expo-navigation-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
 import React, { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 
 export default function TabsLayout() {
     const insets = useSafeAreaInsets();
-
+    const BackButton = () => (
+    <TouchableOpacity
+      onPress={() => {
+      
+          router.back();
+        
+      }}
+      activeOpacity={0.7}
+      style={{ paddingLeft: 8, paddingRight: 12, height: 44, justifyContent: 'center' }}
+    >
+      <Ionicons name="arrow-back" size={28} color={Colors.white} />
+    </TouchableOpacity>
+  );
     useEffect(() => {
         if (Platform.OS !== "android") {
             return;
@@ -24,6 +36,9 @@ export default function TabsLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+                headerTitleStyle: { color: Colors.white },
                 tabBarActiveTintColor: Colors.white,
                 tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
                 tabBarStyle: {
@@ -48,7 +63,7 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "HOME",
+                    title: "Home",
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="home" color={color} size={size - 2} />
                     ),
@@ -57,7 +72,9 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="orders"
                 options={{
-                    title: "ORDERS",
+                    title: "Orders",
+                    headerShown: true,
+                    headerLeft: () => <BackButton />,
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="receipt-outline" color={color} size={size - 2} />
                     ),
@@ -66,7 +83,9 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="menu"
                 options={{
-                    title: "MENU",
+                    title: "Menu",
+                    headerShown: true,
+                    headerLeft: () => <BackButton />,
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="restaurant-outline" color={color} size={size - 2} />
                     ),
@@ -75,7 +94,9 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="stats"
                 options={{
-                    title: "STATS",
+                    title: "Stats",
+                    headerShown: true,
+                    headerLeft: () => <BackButton />,
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="stats-chart-outline" color={color} size={size - 2} />
                     ),
@@ -84,7 +105,9 @@ export default function TabsLayout() {
             <Tabs.Screen
                 name="settings"
                 options={{
-                    title: "SETTINGS",
+                    title: "Settings",
+                    headerShown: true,
+                    headerLeft: () => <BackButton />,
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="settings-outline" color={color} size={size - 2} />
                     ),

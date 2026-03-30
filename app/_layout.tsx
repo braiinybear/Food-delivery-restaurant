@@ -18,7 +18,19 @@ import { router, Stack } from "expo-router";
 import * as ExpoSplashScreen from "expo-splash-screen";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from "react-native"; 
+import { NotificationProvider } from "@/context/NotificationContext";
+import * as Notifications from "expo-notifications";
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldShowAlert: true,
+  }),
+});
+
 
 // Keep the native splash visible while we load
 ExpoSplashScreen.preventAutoHideAsync();
@@ -77,12 +89,13 @@ export default function RootLayout() {
 
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        {/* Animated in-app splash on first load */}
-        {!splashDone && (
-          <SplashScreenView onFinish={() => setSplashDone(true)} />
-        )}
+    <NotificationProvider>
+      <QueryClientProvider client={queryClient}>
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          {/* Animated in-app splash on first load */}
+          {!splashDone && (
+            <SplashScreenView onFinish={() => setSplashDone(true)} />
+          )}
 
         {/* Instant solid overlay during auth state transitions — no fade-in so no black flash */}
         {splashDone && isPending && (
@@ -151,6 +164,7 @@ export default function RootLayout() {
         </Stack>
       </View>
     </QueryClientProvider>
+    </NotificationProvider>
   );
 }
 const transitionStyles = StyleSheet.create({
