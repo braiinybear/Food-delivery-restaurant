@@ -76,7 +76,19 @@ export interface Order {
   items: OrderItem[];
 }
 
+// ✅ Pagination metadata from API
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
+// ✅ Restaurant Orders API Response
+export interface GetRestaurantOrdersResponse {
+  data: Order[];
+  meta: PaginationMeta;
+}
 
 export interface UpdateOrderStatusResponse {
   id: string;

@@ -222,6 +222,14 @@ export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: P
                         <Text style={styles.rejectionHint}>
                             You can resubmit a new application after addressing the above concerns.
                         </Text>
+                        <TouchableOpacity
+                            style={styles.reapplyBtn}
+                            activeOpacity={0.85}
+                            onPress={() => router.push("/restaurantForm")}
+                        >
+                            <Ionicons name="refresh-outline" size={18} color={Colors.white} />
+                            <Text style={styles.reapplyBtnText}>Apply Again</Text>
+                        </TouchableOpacity>
                     </Animated.View>
                 )}
 
@@ -517,5 +525,21 @@ const styles = StyleSheet.create({
         color: Colors.white,
         flex: 1,
         textAlign: "center",
+    },
+    reapplyBtn: {
+        backgroundColor: Colors.primary,
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        marginTop: 8,
+    },
+    reapplyBtnText: {
+        fontFamily: Fonts.brandBold,
+        fontSize: FontSize.md,
+        color: Colors.white,
     },
 });

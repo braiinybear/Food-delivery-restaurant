@@ -1,5 +1,5 @@
 import apiClient from "@/lib/axios";
-import { Order,OrderStatus, UpdateOrderStatusResponse } from "@/types/order";
+import { OrderStatus, UpdateOrderStatusResponse, GetRestaurantOrdersResponse } from "@/types/order";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ✅ Allowed status transitions from backend
@@ -26,16 +26,18 @@ export const isTransitionAllowed = (
   return allowed.includes(toStatus);
 };
 
-export const getRestaurantOrders = async (): Promise<Order[]> => {
-  const { data } = await apiClient.get("/api/orders/restaurant");
+export const getRestaurantOrders = async (page: number = 1, limit: number = 10): Promise<GetRestaurantOrdersResponse> => {
+  const { data } = await apiClient.get<GetRestaurantOrdersResponse>("/api/orders/restaurant", {
+    params: { page, limit },
+  });
   return data;
 };
 
 
-export const useRestaurantOrders = () => {
+export const useRestaurantOrders = (page: number = 1, limit: number = 10) => {
   return useQuery({
-    queryKey: ["restaurant-orders"],
-    queryFn: getRestaurantOrders,
+    queryKey: ["restaurant-orders", page, limit],
+    queryFn: () => getRestaurantOrders(page, limit),
   });
 };
 // .......................................................

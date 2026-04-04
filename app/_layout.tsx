@@ -16,11 +16,13 @@ import { router, Stack } from "expo-router";
 
 // this is the expo splash screen.
 import * as ExpoSplashScreen from "expo-splash-screen";
-
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from "react-native"; 
 import { NotificationProvider } from "@/context/NotificationContext";
 import * as Notifications from "expo-notifications";
+import { initSocket } from "@/lib/socket-client";
+import { useSocketStore } from "@/store/useSocketStore";
+import { useSocketRestaurantOrders } from "@/hooks/useSocketOrders";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -39,6 +41,10 @@ export default function RootLayout() {
   const { data: session, isPending } = authClient.useSession();
   const [appReady, setAppReady] = useState<boolean>(false);
   const [splashDone, setSplashDone] = useState<boolean>(false);
+  const { setConnected, setConnectionError } = useSocketStore();
+  
+  // Start listening for new orders
+  useSocketRestaurantOrders();
 
   // this is the expo font loader.
   const [fontsLoaded] = useFonts({
@@ -54,6 +60,27 @@ export default function RootLayout() {
       ExpoSplashScreen.hideAsync().then(() => setAppReady(true));
     }
   }, [fontsLoaded]);
+
+  // Initialize socket connection
+  useEffect(() => {
+    const connectSocket = async () => {
+      try {
+        const socket = await initSocket();
+        console.log(socket.id);
+        
+        setConnected(true);
+        setConnectionError(null);
+      } catch (error) {
+        setConnectionError(
+          error instanceof Error ? error.message : 'Connection failed'
+        );
+      }
+    };
+
+    if (session?.user) {
+      connectSocket();
+    }
+  }, [session?.user, setConnected, setConnectionError]);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
@@ -89,8 +116,9 @@ export default function RootLayout() {
 
 
   return (
-    <NotificationProvider>
+   
       <QueryClientProvider client={queryClient}>
+         <NotificationProvider>
         <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
           {/* Animated in-app splash on first load */}
           {!splashDone && (
@@ -163,8 +191,8 @@ export default function RootLayout() {
           </Stack.Protected>
         </Stack>
       </View>
+      </NotificationProvider>
     </QueryClientProvider>
-    </NotificationProvider>
   );
 }
 const transitionStyles = StyleSheet.create({
