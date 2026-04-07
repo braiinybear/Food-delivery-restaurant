@@ -5,8 +5,16 @@ export interface IncomingOrder {
   customerId: string;
   items: { name: string; quantity: number; price: number }[];
   totalAmount: number;
-  specialInstructions?: string;
+  itemCount: number;
+  paymentMode: string;
   timestamp: string;
+}
+
+export interface DriverInfo {
+  name: string;
+  phone: string;
+  vehiclePlate: string;
+  profilePic: string;
 }
 
 interface SocketState {
@@ -14,11 +22,12 @@ interface SocketState {
   isConnected: boolean;
   connectionError: string | null;
 
-  // Order management
+  // Current order being managed
   managingOrderId: string | null;
   orderStatus: string | null;
+  assignedDriver: DriverInfo | null;
 
-  // Incoming orders
+  // Incoming orders list
   pendingOrders: IncomingOrder[];
   unreadOrders: number;
 
@@ -26,18 +35,20 @@ interface SocketState {
   setConnected: (connected: boolean) => void;
   setConnectionError: (error: string | null) => void;
   setManagingOrder: (orderId: string | null) => void;
-  updateOrderStatus: (orderId: string, status: string) => void;
-  addPendingOrder: (order: IncomingOrder) => void;
+  handleNewOrder: (order: IncomingOrder) => void;
+  handleOrderStatusUpdate: (orderId: string, status: string) => void;
+  handleDriverAssigned: (orderId: string, driver: DriverInfo) => void;
   removePendingOrder: (orderId: string) => void;
   clearOrders: () => void;
   reset: () => void;
 }
 
-export const useSocketStore = create<SocketState>((set, get) => ({
+export const useSocketStore = create<SocketState>((set) => ({
   isConnected: false,
   connectionError: null,
   managingOrderId: null,
   orderStatus: null,
+  assignedDriver: null,
   pendingOrders: [],
   unreadOrders: 0,
 
@@ -48,20 +59,44 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     set({
       managingOrderId: orderId,
       orderStatus: null,
+      assignedDriver: null,
     }),
 
-  updateOrderStatus: (orderId, status) =>
+  handleNewOrder: (order) =>
+    set((state) => {
+      // Prevent duplicates - check if order already exists
+      const orderExists = state.pendingOrders.some(o => o.orderId === order.orderId);
+      if (orderExists) {
+        console.log(`[SocketStore] ⚠️  Order ${order.orderId} already in pending list - skipping duplicate`);
+        return state;
+      }
+      console.log(`[SocketStore] ✅ Adding NEW order to pending list: ${order.orderId}`);
+      return {
+        pendingOrders: [order, ...state.pendingOrders],
+        unreadOrders: state.unreadOrders + 1,
+      };
+    }),
+
+  handleOrderStatusUpdate: (orderId, status) =>
+    set((state) => {
+      if (state.managingOrderId !== orderId) {
+        return state;
+      }
+
+      const shouldClearDriver = !['PICKED_UP', 'ON_THE_WAY'].includes(status);
+
+      return {
+        orderStatus: status,
+        assignedDriver: shouldClearDriver ? null : state.assignedDriver,
+      };
+    }),
+
+  handleDriverAssigned: (orderId, driver) =>
     set((state) =>
       state.managingOrderId === orderId
-        ? { orderStatus: status }
+        ? { assignedDriver: driver }
         : state,
     ),
-
-  addPendingOrder: (order) =>
-    set((state) => ({
-      pendingOrders: [order, ...state.pendingOrders],
-      unreadOrders: state.unreadOrders + 1,
-    })),
 
   removePendingOrder: (orderId) =>
     set((state) => ({
@@ -82,6 +117,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       connectionError: null,
       managingOrderId: null,
       orderStatus: null,
+      assignedDriver: null,
       pendingOrders: [],
       unreadOrders: 0,
     }),

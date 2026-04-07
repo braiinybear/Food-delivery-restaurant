@@ -12,6 +12,7 @@ import React, {
 
 import { authClient } from "@/lib/auth-client";
 import {
+  useGetPushToken,
   useRegisterPushToken,
   useUpdatePushToken,
 } from "@/hooks/useExpoPushNotication";
@@ -55,6 +56,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const { mutateAsync: registerPushToken } = useRegisterPushToken();
   const { mutateAsync: updatePushToken } = useUpdatePushToken();
+   const { data: serverPushToken } = useGetPushToken();
 
   useEffect(() => {
     let isMounted = true;
@@ -84,14 +86,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           setExpoPushToken(token);
           try {
             // First time opening app - register token
-            if (!session?.session?.pushToken) {
+            if (!serverPushToken?.pushToken) {
               await registerPushToken({ token });
-              console.log("✅ Push token registered with backend");
             }
             // Token changed on subsequent opens - update token
-            else if (session?.session?.pushToken !== token) {
+            else if (serverPushToken?.pushToken !== token) {
               await updatePushToken({ token });
-              console.log("✅ Push token updated with backend");
             }
           } catch (err) {
             console.log("❌ Failed to sync push token:", err);
@@ -139,7 +139,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         responseListener.current.remove();
       }
     };
-  }, [registerPushToken, session, updatePushToken]);
+  }, [registerPushToken, serverPushToken?.pushToken, session, updatePushToken]);
 
   return (
     <NotificationContext.Provider
