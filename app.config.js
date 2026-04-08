@@ -1,4 +1,6 @@
-{
+import 'dotenv/config';
+
+export default {
   "expo": {
     "name": "food-delivery-restaurant",
     "slug": "food-delivery-restaurant",
@@ -21,7 +23,13 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",
-      "package": "com.braiinyfood.fooddeliveryrestaurant"
+      "package": "com.braiinyfood.fooddeliveryrestaurant",
+      "config": {
+        "googleMaps": {
+          // Pulls the key from your local .env or EAS Secrets
+          "apiKey": process.env.GOOGLE_MAPS_API_KEY
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -57,4 +65,4 @@
       }
     }
   }
-}
+};

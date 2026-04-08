@@ -16,7 +16,8 @@ import {
   useRegisterPushToken,
   useUpdatePushToken,
 } from "@/hooks/useExpoPushNotication";
-import { Alert } from "react-native";
+import { router } from "expo-router";
+import { useSocketStore } from "@/store/useSocketStore";
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -56,7 +57,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const { mutateAsync: registerPushToken } = useRegisterPushToken();
   const { mutateAsync: updatePushToken } = useUpdatePushToken();
-   const { data: serverPushToken } = useGetPushToken();
+  const { data: serverPushToken } = useGetPushToken();
+  const setManagingOrder = useSocketStore((state) => state.setManagingOrder);
 
   useEffect(() => {
     let isMounted = true;
@@ -109,25 +111,30 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
         const data = notification.request.content.data;
-        const orderId = data.orderId; // <--- This is your ID
+        const orderId = data.orderId;
         console.log("Order ID received in foreground:", orderId);
         console.log("Notification received app is running:", notification);
         setNotification(notification);
       });
+
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
-        const orderId = data.orderId; // <--- This is your ID
-        Alert.alert("Notification Clicked", `Order ID: ${orderId}`);
-        console.log("User tapped notification for Order:", orderId);
-        console.log(
-          JSON.stringify(response.notification.request.content.data, null, 2),
-        );
-        console.log(
-          "Notification response received user interacts with notifications:",
-          JSON.stringify(response, null, 2),
-          response,
-        );
+        const orderId = data?.orderId as string | undefined;
+
+        console.log("📲 User tapped notification for Order:", orderId);
+
+        if (orderId) {
+          // 1. Set the managing order in the socket store
+          //    → The orders screen watches this and will open the modal
+          setManagingOrder(orderId);
+
+          // 2. Navigate to the orders tab
+          //    Use setTimeout to ensure navigation happens after the app is fully active
+          setTimeout(() => {
+            router.push("/(tabs)/orders");
+          }, 300);
+        }
       });
 
     return () => {
@@ -139,7 +146,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         responseListener.current.remove();
       }
     };
-  }, [registerPushToken, serverPushToken?.pushToken, session, updatePushToken]);
+  }, [registerPushToken, serverPushToken?.pushToken, session, updatePushToken, setManagingOrder]);
 
   return (
     <NotificationContext.Provider

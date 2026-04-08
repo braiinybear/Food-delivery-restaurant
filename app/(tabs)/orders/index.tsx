@@ -1,12 +1,12 @@
 import { Colors } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
-import { useRestaurantOrders, useUpdateOrderStatus, getAllowedTransitions } from "@/hooks/useOrders";
+import { useRestaurantOrders, useUpdateOrderStatus, useBulkUpdateOrderStatus, getAllowedTransitions } from "@/hooks/useOrders";
 import { useSocketRestaurantOrders, useManageRestaurantOrder, useEmitOrderStatus } from "@/hooks/useSocketOrders";
 import { useSocketStore } from "@/store/useSocketStore";
 import { Ionicons } from "@expo/vector-icons";
 import { OrderProgressBar } from "@/components/OrderProgressBar";
 import React from "react";
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Image, Pressable, Modal } from "react-native";
+import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Image, Pressable, Modal, Animated, Easing } from "react-native";
 import { OrderStatus } from "@/types/order";
 
 const STATUS_TABS = ["PLACED", "ACCEPTED", "PREPARING", "READY", "CANCELLED"];
@@ -79,9 +79,11 @@ const formatItemsList = (items: any[]): string => {
 };
 
 export default function OrdersScreen() {
+    const [activeTab, setActiveTab] = React.useState("PLACED");
     const [page, setPage] = React.useState(1);
-    const { data: response, isLoading, refetch } = useRestaurantOrders(page, 10);
+    const { data: response, isLoading, refetch } = useRestaurantOrders(page, 10, activeTab);
     const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
+    const { mutate: bulkUpdateStatus, isPending: isBulkPending } = useBulkUpdateOrderStatus();
     const { updateStatus: emitStatusUpdate } = useEmitOrderStatus();
     
     // ✅ Listen for real-time socket updates
@@ -103,9 +105,10 @@ export default function OrdersScreen() {
         if (!response?.meta) return { total: 0, page: 1, limit: 10, totalPages: 0 };
         return response.meta;
     }, [response]);
-    const [activeTab, setActiveTab] = React.useState("PLACED");
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
+    const [selectedOrderIds, setSelectedOrderIds] = React.useState<string[]>([]);
+    const isSelectionMode = selectedOrderIds.length > 0;
     const selectedOrder = ordersArray.find(o => o.id === selectedOrderId);
 
         // Subscribe to socket pending orders so UI can refresh when new orders arrive
@@ -139,8 +142,38 @@ export default function OrdersScreen() {
       }
     }, [selectedOrderId, setManagingOrder]);
 
+    // ✅ DEEP LINK: When managingOrderId is set externally (e.g. notification tap),
+    //    auto-open the order modal by syncing selectedOrderId
+    React.useEffect(() => {
+      if (managingOrderId && managingOrderId !== selectedOrderId) {
+        console.log(`[Orders] 📲 Deep link: opening order from notification: ${managingOrderId}`);
+        setSelectedOrderId(managingOrderId);
+      }
+    }, [managingOrderId]);
+
+    // ✅ RESET: Return to page 1 when tab changes
+    React.useEffect(() => {
+        setPage(1);
+        setSelectedOrderIds([]); // Clear selection when switching tabs for clarity
+    }, [activeTab]);
+
+    const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
+    const spinAnim = React.useRef(new Animated.Value(0)).current;
+
     const handleRefresh = React.useCallback(async () => {
         setIsRefreshing(true);
+        setIsManualRefreshing(true);
+        
+        // Start spinning
+        Animated.loop(
+            Animated.timing(spinAnim, {
+                toValue: 1,
+                duration: 800,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            })
+        ).start();
+
         try {
             if (refetch) {
                 await refetch();
@@ -149,15 +182,102 @@ export default function OrdersScreen() {
             console.error("Error refreshing orders:", error);
         } finally {
             setIsRefreshing(false);
+            // Stop spinning after a small delay
+            setTimeout(() => {
+                setIsManualRefreshing(false);
+                spinAnim.stopAnimation();
+                spinAnim.setValue(0);
+            }, 600);
         }
-    }, [refetch]);
+    }, [refetch, spinAnim]);
 
-    const filtered = (ordersArray || []).filter(o => o.status === activeTab);
+    const spin = spinAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg']
+    });
+
+    const isSocketConnected = useSocketStore((state) => state.isConnected);
+
+    // const filtered = (ordersArray || []).filter(o => o.status === activeTab);
+    const filtered = ordersArray; // Data is now pre-filtered by backend!
+
+    const toggleSelection = React.useCallback((orderId: string) => {
+        setSelectedOrderIds(prev => 
+            prev.includes(orderId) 
+                ? prev.filter(id => id !== orderId) 
+                : [...prev, orderId]
+        );
+    }, []);
+
+    const handleBulkStatusUpdate = React.useCallback(async (status: OrderStatus) => {
+        if (selectedOrderIds.length === 0) return;
+        
+        bulkUpdateStatus({
+            orderIds: selectedOrderIds,
+            status
+        }, {
+            onSuccess: () => {
+                setSelectedOrderIds([]);
+            }
+        });
+    }, [selectedOrderIds, bulkUpdateStatus]);
+
+    const selectAll = React.useCallback(() => {
+        setSelectedOrderIds(filtered.map(o => o.id));
+    }, [filtered]);
+
+    const clearSelection = React.useCallback(() => {
+        setSelectedOrderIds([]);
+    }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: Colors.background }]}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
             
+            {/* NEW: Top Action Bar for Refresh & Status */}
+            <View style={styles.topHeader}>
+                <View>
+                    {isSelectionMode ? (
+                        <View style={styles.selectionHeader}>
+                            <TouchableOpacity onPress={clearSelection}>
+                                <Ionicons name="close" size={24} color={Colors.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.selectionCountText}>
+                                {selectedOrderIds.length} Selected
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.statusRowHeader}>
+                            <View style={[
+                                styles.statusDotHeader, 
+                                { backgroundColor: isSocketConnected ? '#4CAF50' : '#F44336' }
+                            ]} />
+                            <Text style={styles.statusTextHeader}>
+                                {isSocketConnected ? 'Live' : 'Offline'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+                
+                <TouchableOpacity 
+                    onPress={handleRefresh}
+                    disabled={isRefreshing}
+                    style={styles.refreshIconButton}
+                >
+                    <Animated.View style={{ 
+                        transform: [{ 
+                            rotate: spin 
+                        }] 
+                    }}>
+                        <Ionicons 
+                            name="sync-outline" 
+                            size={24} 
+                            color={Colors.primary} 
+                        />
+                    </Animated.View>
+                </TouchableOpacity>
+            </View>
+
             {/* Tabs - Sticky Header */}
             <View style={[styles.tabsWrapper, { zIndex: 1000 }]}>
                 <ScrollView
@@ -229,12 +349,29 @@ export default function OrdersScreen() {
                         return (
                             <Pressable 
                                 key={order.id}
-                                onPress={() => setSelectedOrderId(order.id)}
+                                onPress={() => {
+                                    if (isSelectionMode) {
+                                        toggleSelection(order.id);
+                                    } else {
+                                        setSelectedOrderId(order.id);
+                                    }
+                                }}
+                                onLongPress={() => {
+                                    if (!isSelectionMode) {
+                                        toggleSelection(order.id);
+                                    }
+                                }}
                                 style={({ pressed }) => [
                                     styles.premiumOrderCard,
+                                    selectedOrderIds.includes(order.id) && styles.orderCardSelected,
                                     { opacity: pressed ? 0.85 : 1 }
                                 ]}
                             >
+                                {selectedOrderIds.includes(order.id) && (
+                                    <View style={styles.selectionIndicator}>
+                                        <Ionicons name="checkmark" size={16} color={Colors.white} />
+                                    </View>
+                                )}
                                 {/* Top Header with Order ID and Status */}
                                 <View style={styles.cardHeader}>
                                     <View style={styles.headerLeft}>
@@ -362,6 +499,41 @@ export default function OrdersScreen() {
                         );
                     })}
                 </ScrollView>
+            )}
+
+            {/* Bulk Action Bar */}
+            {isSelectionMode && (
+                <View style={styles.bulkActionBar}>
+                    <Text style={styles.tabText}>
+                        {selectedOrderIds.length} Selected
+                    </Text>
+                    <View style={styles.bulkActionButtons}>
+                        {activeTab === 'PLACED' && (
+                            <TouchableOpacity 
+                                style={styles.bulkActionButton}
+                                onPress={() => handleBulkStatusUpdate('ACCEPTED')}
+                                disabled={isBulkPending}
+                            >
+                                <Text style={styles.bulkActionButtonText}>Accept All</Text>
+                            </TouchableOpacity>
+                        )}
+                        {activeTab === 'PREPARING' && (
+                            <TouchableOpacity 
+                                style={styles.bulkActionButton}
+                                onPress={() => handleBulkStatusUpdate('READY')}
+                                disabled={isBulkPending}
+                            >
+                                <Text style={styles.bulkActionButtonText}>Mark Ready</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity 
+                            style={styles.bulkActionCancel}
+                            onPress={clearSelection}
+                        >
+                            <Ionicons name="close-circle" size={28} color={Colors.white} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
             )}
 
             {/* Pagination Bubbles with Arrows - Always Visible */}
@@ -630,7 +802,109 @@ const styles = StyleSheet.create({
     container: { 
         flex: 1,
         backgroundColor: Colors.background,
-        paddingTop: 4,
+    },
+    topHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 12,
+        backgroundColor: Colors.surface,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
+    },
+    statusRowHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 2,
+    },
+    statusDotHeader: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    statusTextHeader: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+        fontFamily: Fonts.brandMedium,
+    },
+    refreshIconButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F0F0F0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    selectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    selectionCountText: {
+        fontSize: 18,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
+    },
+    bulkActionBar: {
+        position: 'absolute',
+        bottom: 90, // Move up a bit to clear system nav or bottom tabs
+        left: 20,
+        right: 20,
+        backgroundColor: Colors.primary,
+        borderRadius: 16,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4.65,
+        elevation: 10,
+        zIndex: 9999, // Ensure it is on top
+    },
+    bulkActionButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    bulkActionButton: {
+        backgroundColor: Colors.white,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    bulkActionButtonText: {
+        color: Colors.primary,
+        fontFamily: Fonts.brandBold,
+        fontSize: 14,
+    },
+    bulkActionCancel: {
+        padding: 8,
+    },
+    orderCardSelected: {
+        borderColor: Colors.primary,
+        borderWidth: 2,
+        backgroundColor: '#F0F7FF',
+    },
+    selectionIndicator: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: Colors.primary,
+        backgroundColor: Colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
     },
     loaderContainer: {
         flex: 1,

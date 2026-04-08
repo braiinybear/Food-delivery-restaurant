@@ -93,13 +93,13 @@ export function disconnectSocket(): void {
  */
 export function reconnectSocketIfNeeded(): void {
   if (socket) {
-    if (!socket.connected) {
-      console.log('[Socket] 🔌 Attempting to reconnect (app resumed from background)');
+    if (!socket.connected || socket.disconnected) {
+      console.log('[Socket] 🔌 Socket state check: disconnected. Attempting reconnection...');
       socket.connect();
     } else {
-      console.log('[Socket] ✅ Socket already connected');
+      console.log('[Socket] ✅ Socket is still connected');
     }
   } else {
-    console.log('[Socket] ⚠️  Socket not initialized yet');
+    console.log('[Socket] ⚠️  Socket not initialized yet. Skipping reconnection check.');
   }
 }

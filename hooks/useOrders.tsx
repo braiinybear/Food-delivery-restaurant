@@ -27,18 +27,26 @@ export const isTransitionAllowed = (
   return allowed.includes(toStatus);
 };
 
-export const getRestaurantOrders = async (page: number = 1, limit: number = 10): Promise<GetRestaurantOrdersResponse> => {
+export const getRestaurantOrders = async (
+  page: number = 1, 
+  limit: number = 10,
+  status?: string
+): Promise<GetRestaurantOrdersResponse> => {
   const { data } = await apiClient.get<GetRestaurantOrdersResponse>("/api/orders/restaurant", {
-    params: { page, limit },
+    params: { page, limit, status },
   });
   return data;
 };
 
 
-export const useRestaurantOrders = (page: number = 1, limit: number = 10) => {
+export const useRestaurantOrders = (
+  page: number = 1, 
+  limit: number = 10,
+  status?: string
+) => {
   return useQuery({
-    queryKey: ["restaurant-orders", page, limit],
-    queryFn: () => getRestaurantOrders(page, limit),
+    queryKey: ["restaurant-orders", page, limit, status],
+    queryFn: () => getRestaurantOrders(page, limit, status),
   });
 };
 
@@ -118,6 +126,47 @@ export const useUpdateOrderStatus = () => {
         // fall back to invalidation if merging fails
         console.warn('Failed to merge updated order into cache, invalidating instead', e);
         queryClient.invalidateQueries({ predicate: query => query.queryKey[0] === 'restaurant-orders' });
+      }
+    },
+  });
+};
+
+export const bulkUpdateOrderStatus = async (
+  orderIds: string[],
+  status: OrderStatus
+): Promise<any> => {
+  const { data } = await apiClient.patch(
+    `/api/orders/bulk-status`,
+    { orderIds, status }
+  );
+
+  return data;
+};
+
+export const useBulkUpdateOrderStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      orderIds,
+      status,
+    }: {
+      orderIds: string[];
+      status: OrderStatus;
+    }) => bulkUpdateOrderStatus(orderIds, status),
+
+    onSuccess: (response: any) => {
+      // Invalidate all restaurant orders to reflect bulk changes
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
+      
+      // Also invalidate single order caches if necessary
+      if (response && Array.isArray(response.results)) {
+        response.results.forEach((order: any) => {
+          queryClient.invalidateQueries({ queryKey: ["order", order.id] });
+          try {
+            useSocketStore.getState().removePendingOrder(order.id);
+          } catch (e) {}
+        });
       }
     },
   });

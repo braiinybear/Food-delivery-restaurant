@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useSocketStore } from '@/store/useSocketStore';
 import { getSocket } from '@/lib/socket-client';
 import apiClient from '@/lib/axios';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * useSocketRestaurantOrders: Registers socket event listeners for restaurant.
@@ -9,6 +10,7 @@ import apiClient from '@/lib/axios';
  * event fires by waiting and registering listeners on connect when needed.
  */
 export function useSocketRestaurantOrders() {
+  const queryClient = useQueryClient();
   const {
     handleNewOrder,
     handleOrderStatusUpdate,
@@ -27,16 +29,21 @@ export function useSocketRestaurantOrders() {
     const handleNewOrderEvent = (data: any) => {
       console.log('[Restaurant] new_order received:', data.orderId);
       handleNewOrder(data);
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
     };
 
     const handleOrderStatusUpdateEvent = (data: any) => {
       console.log('[Restaurant] order_status_update received:', data.orderId, data.status);
       handleOrderStatusUpdate(data.orderId, data.status);
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order", data.orderId] });
     };
 
     const handleDriverAssignedEvent = (data: any) => {
       console.log('[Restaurant] driver_assigned received:', data.orderId);
       handleDriverAssigned(data.orderId, data.driver);
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order", data.orderId] });
     };
 
     let listenersRegistered = false;
