@@ -63,7 +63,7 @@ export default function HomeScreen() {
 
   // Wait for SecureStore hydration before reading persisted state
   if (!_hasHydrated) return null;
-  if (session && user?.role !== "RESTAURANT_MANAGER" && !appliedForPartner) {
+  if (session && user?.role !== "RESTAURANT_MANAGER" && user?.role !== "ADMIN" && !appliedForPartner) {
     return (
       <>
         <Tabs.Screen options={{ tabBarStyle: { display: "none" } }} />
