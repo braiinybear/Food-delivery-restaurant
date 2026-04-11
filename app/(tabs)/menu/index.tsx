@@ -187,7 +187,7 @@ function AddCategoryModal({
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
-  const [catgoryImage, setCategoryImage] = useState<string | null>(null);
+  const [categoryImage, setCategoryImage] = useState<string | null>(null);
   const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { mutate: createCategory, isPending } = useCreateMenuCategory();
@@ -293,21 +293,21 @@ function AddCategoryModal({
       Alert.alert("Validation", "Category name cannot be empty.");
       return;
     }
-    if (!catgoryImage) {
+    if (!categoryImage) {
       Alert.alert("Validation", "Please upload a category image.");
       return;
     }
 
     console.log("Creating category with:", {
       name: name.trim(),
-      image: catgoryImage,
+      image: categoryImage,
       type: type || undefined,
     });
 
     createCategory(
       {
         name: name.trim(),
-        image: catgoryImage,
+        image: categoryImage,
         type: type || undefined,
       },
       {
@@ -408,7 +408,7 @@ function AddCategoryModal({
             <TouchableOpacity
               style={[
                 styles.uploadCard,
-                catgoryImage && {
+                categoryImage && {
                   borderColor: Colors.primary,
                   borderStyle: "solid",
                 },
@@ -417,10 +417,10 @@ function AddCategoryModal({
               disabled={isCloudinaryUploading}
               activeOpacity={0.7}
             >
-              {catgoryImage ? (
+              {categoryImage ? (
                 <>
                   <Image
-                    source={{ uri: catgoryImage }}
+                    source={{ uri: categoryImage }}
                     style={styles.uploadCardImage}
                   />
                   <View style={styles.uploadCardOverlay}>
@@ -459,7 +459,7 @@ function AddCategoryModal({
 
             <Text style={styles.inputLabel}>Category Type (Optional)</Text>
             <View style={styles.typeContainer}>
-              {["VEG", "NON_VEG", "VEGAN", "DRINKS"].map((categoryType) => (
+              {["VEG", "NON_VEG", "VEGAN"].map((categoryType) => (
                 <TouchableOpacity
                   key={categoryType}
                   style={[

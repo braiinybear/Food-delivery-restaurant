@@ -31,7 +31,7 @@ import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const ITEM_TYPES = ["VEG", "NON_VEG", "EGG", "VEGAN"] as const;
+const ITEM_TYPES = ["VEG", "NON_VEG", "VEGAN"] as const;
 const SPICE_LEVELS = ["Low", "Medium", "High"] as const;
 
 const TYPE_CONFIG: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap; label: string }> = {

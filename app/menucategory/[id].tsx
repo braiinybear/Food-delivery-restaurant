@@ -359,7 +359,7 @@ function EditCategoryModal({
 
             <Text style={styles.inputLabel}>Category Type (Optional)</Text>
             <View style={styles.createModalPillGroup}>
-              {["VEG", "NON_VEG", "VEGAN", "DRINKS"].map((categoryType) => (
+              {["VEG", "NON_VEG", "VEGAN"].map((categoryType) => (
                 <TouchableOpacity
                   key={categoryType}
                   style={[
@@ -562,7 +562,7 @@ function CreateMenuItemModal({
     );
   };
 
-  const ITEM_TYPES = ["VEG", "NON_VEG", "EGG", "VEGAN"] as const;
+  const ITEM_TYPES = ["VEG", "NON_VEG", "VEGAN"] as const;
   const SPICE_LEVELS = ["Low", "Medium", "High"] as const;
 
   const TYPE_PILL_COLORS: Record<string, string> = {
