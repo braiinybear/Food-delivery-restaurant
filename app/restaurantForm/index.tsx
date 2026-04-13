@@ -6,12 +6,9 @@ import {
     TouchableOpacity,
     ScrollView,
     StyleSheet,
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
     Image,
 } from "react-native";
+import { showAlert } from "@/store/useAlertStore";
 import { useSubmitRestaurantPartnerRequest } from "../../hooks/useRestaurantPartnerRequest";
 import { Colors } from "../../constants/colors";
 import { router } from "expo-router";
@@ -64,7 +61,7 @@ export default function RestaurantForm() {
                 try {
                     await validateImage(imageUri, 5); // 5MB max
                 } catch (validationError) {
-                    Alert.alert(
+                    showAlert(
                         "Invalid Image",
                         validationError instanceof Error
                             ? validationError.message
@@ -100,13 +97,13 @@ export default function RestaurantForm() {
                     setImageUrl(response.secure_url);
 
                     // ─── Show success message ──────────────────────────────
-                    Alert.alert(
+                    showAlert(
                         "Success! ✅",
                         `${itemName} uploaded to cloud successfully`,
                         [{ text: "OK" }],
                     );
                 } catch (uploadError) {
-                    Alert.alert(
+                    showAlert(
                         "Upload Failed ❌",
                         uploadError instanceof Error
                             ? uploadError.message
@@ -120,7 +117,7 @@ export default function RestaurantForm() {
                 }
             }
         } catch (error) {
-            Alert.alert(
+            showAlert(
                 "Error",
                 error instanceof Error ? error.message : "An error occurred",
                 [{ text: "OK" }],
@@ -149,7 +146,7 @@ export default function RestaurantForm() {
             !bannerUrl ||
             !fssaiDocUrl
         ) {
-            Alert.alert("Validation Error", "Please fill in all fields including image uploads.");
+            showAlert("Validation Error", "Please fill in all fields including image uploads.");
             return;
         }
 
@@ -168,7 +165,7 @@ export default function RestaurantForm() {
             },
             {
                 onSuccess: (data) => {
-                    Alert.alert(
+                    showAlert(
                         "Application Submitted! 🎉",
                         `Your restaurant "${data.restaurantName}" has been submitted.\nStatus: ${data.status}`,
                         [{ text: "OK" }]
@@ -179,12 +176,12 @@ export default function RestaurantForm() {
                 onError: (error: any) => {
                     const status = error?.response?.status;
                     if (status === 409) {
-                        Alert.alert(
+                        showAlert(
                             "Already Applied",
                             "You already have an existing application. Our team will review it soon."
                         );
                     } else {
-                        Alert.alert(
+                        showAlert(
                             "Error",
                             error?.response?.data?.message || "Something went wrong."
                         );

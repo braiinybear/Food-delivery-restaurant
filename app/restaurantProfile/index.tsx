@@ -11,9 +11,9 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   RefreshControl,
 } from "react-native";
+import { showAlert } from "@/store/useAlertStore";
 import { Ionicons } from "@expo/vector-icons";
 import {
   useMyRestaurant,
@@ -74,7 +74,7 @@ export default function RestaurantProfile() {
     restaurant.banner || restaurant.image || getPlaceholderImage(restaurant.id);
 
   const handleDelete = () => {
-    Alert.alert(
+    showAlert(
       "Delete Restaurant",
       `Are you sure you want to delete "${restaurant.name}"? This action cannot be undone.`,
       [
@@ -85,11 +85,11 @@ export default function RestaurantProfile() {
           onPress: () =>
             deleteRestaurant(restaurant.id, {
               onSuccess: () => {
-                Alert.alert("Deleted", "Restaurant has been deleted.");
+                showAlert("Deleted", "Restaurant has been deleted.");
                 router.replace("/");
               },
               onError: () =>
-                Alert.alert("Error", "Failed to delete restaurant."),
+                showAlert("Error", "Failed to delete restaurant."),
             }),
         },
       ]
@@ -359,7 +359,7 @@ function EditRestaurantModal({
     const trimmed = customCuisine.trim();
     if (!trimmed) return;
     if (cuisines.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-      Alert.alert("Duplicate", "This cuisine is already added.");
+      showAlert("Duplicate", "This cuisine is already added.");
       return;
     }
     setCuisines((prev) => [...prev, trimmed]);
@@ -369,7 +369,7 @@ function EditRestaurantModal({
 
   const handleSave = () => {
     if (!name.trim() || !address.trim() || cuisines.length === 0) {
-      Alert.alert("Validation", "Name, address, and at least one cuisine are required.");
+      showAlert("Validation", "Name, address, and at least one cuisine are required.");
       return;
     }
 
@@ -389,11 +389,11 @@ function EditRestaurantModal({
       },
       {
         onSuccess: () => {
-          Alert.alert("Updated", "Restaurant details updated successfully.");
+          showAlert("Updated", "Restaurant details updated successfully.");
           onClose();
         },
         onError: () =>
-          Alert.alert("Error", "Failed to update restaurant. Try again."),
+          showAlert("Error", "Failed to update restaurant. Try again."),
       }
     );
   };

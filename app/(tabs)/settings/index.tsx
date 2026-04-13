@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -11,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { showAlert } from "@/store/useAlertStore";
 import { Colors } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
     const [signingOut, setSigningOut] = useState(false);
 
     const handleSignOut = () => {
-        Alert.alert(
+        showAlert(
             "Sign Out",
             "Are you sure you want to sign out?",
             [
@@ -60,7 +60,7 @@ export default function SettingsScreen() {
                         } catch (err) {
                             console.log(err);
                             
-                            Alert.alert("Error", "Failed to sign out. Please try again.");
+                            showAlert("Error", "Failed to sign out. Please try again.");
                         } finally {
                             setSigningOut(false);
                         }
@@ -80,7 +80,7 @@ export default function SettingsScreen() {
                     sublabel: "Name, address, cuisine",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Restaurant Profile"),
+                    onPress: () => showAlert("Restaurant Profile"),
                 },
                 {
                     icon: "time-outline",
@@ -88,7 +88,7 @@ export default function SettingsScreen() {
                     sublabel: "Mon–Sun schedule",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Opening Hours"),
+                    onPress: () => showAlert("Opening Hours"),
                 },
                 {
                     icon: "bicycle-outline",
@@ -96,7 +96,7 @@ export default function SettingsScreen() {
                     sublabel: "Radius & fee configuration",
                     type: "nav",
                     iconBg: Colors.success + "22",
-                    onPress: () => Alert.alert("Delivery Zones"),
+                    onPress: () => showAlert("Delivery Zones"),
                 },
                 {
                     icon: "flash-outline",
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
                     sublabel: "Amber (default)",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Theme Color"),
+                    onPress: () => showAlert("Theme Color"),
                 },
             ],
         },
@@ -172,7 +172,7 @@ export default function SettingsScreen() {
                     sublabel: "Email, phone, password",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Account Details"),
+                    onPress: () => showAlert("Account Details"),
                 },
                 {
                     icon: "card-outline",
@@ -180,7 +180,7 @@ export default function SettingsScreen() {
                     sublabel: "Bank & payout settings",
                     type: "nav",
                     iconBg: Colors.success + "22",
-                    onPress: () => Alert.alert("Payment Info"),
+                    onPress: () => showAlert("Payment Info"),
                 },
                 {
                     icon: "shield-checkmark-outline",
@@ -188,7 +188,7 @@ export default function SettingsScreen() {
                     sublabel: "2FA, data, permissions",
                     type: "nav",
                     iconBg: Colors.warning + "22",
-                    onPress: () => Alert.alert("Privacy"),
+                    onPress: () => showAlert("Privacy"),
                 },
             ],
         },
@@ -201,7 +201,7 @@ export default function SettingsScreen() {
                     sublabel: "FAQs & documentation",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Help"),
+                    onPress: () => showAlert("Help"),
                 },
                 {
                     icon: "chatbubbles-outline",
@@ -209,7 +209,7 @@ export default function SettingsScreen() {
                     sublabel: "Chat or call us",
                     type: "nav",
                     iconBg: Colors.primary + "22",
-                    onPress: () => Alert.alert("Support"),
+                    onPress: () => showAlert("Support"),
                 },
                 {
                     icon: "information-circle-outline",

@@ -18,6 +18,7 @@ import { router, Stack } from "expo-router";
 import * as ExpoSplashScreen from "expo-splash-screen";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from "react-native"; 
+import GlobalCustomAlert from "@/components/GlobalCustomAlert";
 import { NotificationProvider } from "@/context/NotificationContext";
 import * as Notifications from "expo-notifications";
 import { SocketProvider } from "@/context/SocketContext";
@@ -159,6 +160,7 @@ export default function RootLayout() {
           </View>
         </SocketProvider>
       </NotificationProvider>
+      <GlobalCustomAlert />
     </QueryClientProvider>
   );
 }

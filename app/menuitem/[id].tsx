@@ -13,7 +13,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Image,
     KeyboardAvoidingView,
     Platform,
@@ -28,6 +27,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
+import { showAlert } from "@/store/useAlertStore";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -173,7 +173,7 @@ export default function MenuItemDetailScreen() {
                 try {
                     await validateImage(imageUri, 5); // 5MB max
                 } catch (validationError) {
-                    Alert.alert(
+                    showAlert(
                         "Invalid Image",
                         validationError instanceof Error
                             ? validationError.message
@@ -212,13 +212,13 @@ export default function MenuItemDetailScreen() {
                     setUploadProgress(0);
 
                     // ─── Show success message ──────────────────────────────
-                    Alert.alert(
+                    showAlert(
                         "Success! ✅",
                         "Menu item image uploaded successfully",
                         [{ text: "OK" }],
                     );
                 } catch (uploadError) {
-                    Alert.alert(
+                    showAlert(
                         "Upload Failed ❌",
                         uploadError instanceof Error
                             ? uploadError.message
@@ -231,7 +231,7 @@ export default function MenuItemDetailScreen() {
                 }
             }
         } catch (error) {
-            Alert.alert(
+            showAlert(
                 "Error",
                 error instanceof Error ? error.message : "An error occurred",
                 [{ text: "OK" }],
@@ -241,12 +241,12 @@ export default function MenuItemDetailScreen() {
 
     const handleSave = () => {
         if (!name.trim()) {
-            Alert.alert("Validation", "Item name cannot be empty.");
+            showAlert("Validation", "Item name cannot be empty.");
             return;
         }
         const parsedPrice = parseFloat(price);
         if (isNaN(parsedPrice) || parsedPrice <= 0) {
-            Alert.alert("Validation", "Please enter a valid price.");
+            showAlert("Validation", "Please enter a valid price.");
             return;
         }
 
@@ -267,9 +267,9 @@ export default function MenuItemDetailScreen() {
             {
                 onSuccess: () => {
                     setIsDirty(false);
-                    Alert.alert("Success", "Menu item updated successfully.");
+                    showAlert("Success", "Menu item updated successfully.");
                 },
-                onError: () => Alert.alert("Error", "Failed to update menu item. Try again."),
+                onError: () => showAlert("Error", "Failed to update menu item. Try again."),
             }
         );
     };
@@ -282,14 +282,14 @@ export default function MenuItemDetailScreen() {
             {
                 onError: () => {
                     setIsAvailable(!newVal); // revert on failure
-                    Alert.alert("Error", "Couldn't update availability.");
+                    showAlert("Error", "Couldn't update availability.");
                 },
             }
         );
     };
 
     const handleDelete = () => {
-        Alert.alert(
+        showAlert(
             "Delete Item",
             `Are you sure you want to delete "${item?.name}"? This action cannot be undone.`,
             [
@@ -300,7 +300,7 @@ export default function MenuItemDetailScreen() {
                     onPress: () => {
                         deleteItem(id ?? "", {
                             onSuccess: () => router.back(),
-                            onError: () => Alert.alert("Error", "Failed to delete item. Try again."),
+                            onError: () => showAlert("Error", "Failed to delete item. Try again."),
                         });
                     },
                 },

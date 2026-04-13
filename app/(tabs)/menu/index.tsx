@@ -12,7 +12,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
+import { showAlert } from "@/store/useAlertStore";
 import MenuCategorySkeleton from "@/components/loading/MenuCategory";
 import MenuItemSkeleton from "@/components/loading/MenuItemSkelton";
 
@@ -208,7 +208,7 @@ function AddCategoryModal({
         try {
           await validateImage(imageUri, 5); // 5MB max
         } catch (validationError) {
-          Alert.alert(
+          showAlert(
             "Invalid Image",
             validationError instanceof Error
               ? validationError.message
@@ -261,13 +261,13 @@ function AddCategoryModal({
           setUploadProgress(0);
 
           // ─── Show success message ──────────────────────────────
-          Alert.alert(
+          showAlert(
             "Success! ✅",
             "Category image uploaded to cloud successfully",
             [{ text: "OK" }],
           );
         } catch (uploadError) {
-          Alert.alert(
+          showAlert(
             "Upload Failed ❌",
             uploadError instanceof Error
               ? uploadError.message
@@ -280,7 +280,7 @@ function AddCategoryModal({
         }
       }
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "Error",
         error instanceof Error ? error.message : "An error occurred",
         [{ text: "OK" }],
@@ -290,11 +290,11 @@ function AddCategoryModal({
 
   const handleAdd = () => {
     if (!name.trim()) {
-      Alert.alert("Validation", "Category name cannot be empty.");
+      showAlert("Validation", "Category name cannot be empty.");
       return;
     }
     if (!categoryImage) {
-      Alert.alert("Validation", "Please upload a category image.");
+      showAlert("Validation", "Please upload a category image.");
       return;
     }
 
@@ -312,7 +312,7 @@ function AddCategoryModal({
       },
       {
         onSuccess: () => {
-          Alert.alert("Success! 🎉", "Category created successfully", [
+          showAlert("Success! 🎉", "Category created successfully", [
             { text: "OK" },
           ]);
           setName("");
@@ -324,7 +324,7 @@ function AddCategoryModal({
           const errorMessage =
             error?.response?.data?.message ||
             "Failed to create category. Please try again.";
-          Alert.alert("Error", errorMessage);
+          showAlert("Error", errorMessage);
         },
       },
     );

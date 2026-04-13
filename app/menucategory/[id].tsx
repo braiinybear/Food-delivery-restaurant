@@ -12,7 +12,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
+import { showAlert } from "@/store/useAlertStore";
 
 // ─── Type badge colours ───────────────────────────────────────────────────────
 const TYPE_COLORS: Record<string, string> = {
@@ -136,7 +136,7 @@ function EditCategoryModal({
         try {
           await validateImage(imageUri, 5); // 5MB max
         } catch (validationError) {
-          Alert.alert(
+          showAlert(
             "Invalid Image",
             validationError instanceof Error
               ? validationError.message
@@ -177,13 +177,13 @@ function EditCategoryModal({
           setUploadProgress(0);
 
           // ─── Show success message ──────────────────────────────
-          Alert.alert(
+          showAlert(
             "Success! ✅",
             "Category image updated successfully",
             [{ text: "OK" }],
           );
         } catch (uploadError) {
-          Alert.alert(
+          showAlert(
             "Upload Failed ❌",
             uploadError instanceof Error
               ? uploadError.message
@@ -196,7 +196,7 @@ function EditCategoryModal({
         }
       }
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "Error",
         error instanceof Error ? error.message : "An error occurred",
         [{ text: "OK" }],
@@ -206,7 +206,7 @@ function EditCategoryModal({
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert("Validation", "Category name cannot be empty.");
+      showAlert("Validation", "Category name cannot be empty.");
       return;
     }
     
@@ -228,12 +228,12 @@ function EditCategoryModal({
       { id: categoryId, body: updateBody },
       {
         onSuccess: () => {
-          Alert.alert("Success! ✅", "Category updated successfully");
+          showAlert("Success! ✅", "Category updated successfully");
           onClose();
         },
         onError: (error: any) => {
           const errorMessage = error?.response?.data?.message || "Failed to update category. Please try again.";
-          Alert.alert("Error", errorMessage);
+          showAlert("Error", errorMessage);
         },
       },
     );
@@ -460,7 +460,7 @@ function CreateMenuItemModal({
         try {
           await validateImage(imageUri, 5); // 5MB max
         } catch (validationError) {
-          Alert.alert(
+          showAlert(
             "Invalid Image",
             validationError instanceof Error
               ? validationError.message
@@ -498,13 +498,13 @@ function CreateMenuItemModal({
           setUploadProgress(0);
 
           // ─── Show success message ──────────────────────────────
-          Alert.alert(
+          showAlert(
             "Success! ✅",
             "Menu item image uploaded successfully",
             [{ text: "OK" }],
           );
         } catch (uploadError) {
-          Alert.alert(
+          showAlert(
             "Upload Failed ❌",
             uploadError instanceof Error
               ? uploadError.message
@@ -517,7 +517,7 @@ function CreateMenuItemModal({
         }
       }
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "Error",
         error instanceof Error ? error.message : "An error occurred",
         [{ text: "OK" }],
@@ -527,7 +527,7 @@ function CreateMenuItemModal({
 
   const handleSubmit = () => {
     if (!form.name.trim()) {
-      Alert.alert("Validation", "Item name required");
+      showAlert("Validation", "Item name required");
       return;
     }
 
@@ -557,7 +557,7 @@ function CreateMenuItemModal({
             isBestseller: false,
           });
         },
-        onError: () => Alert.alert("Error", "Failed to create menu item."),
+        onError: () => showAlert("Error", "Failed to create menu item."),
       },
     );
   };
@@ -864,7 +864,7 @@ export default function MenuCategoryDetailScreen() {
     useDeleteMenuCategory();
 
   const handleDelete = () => {
-    Alert.alert(
+    showAlert(
       "Delete Category",
       `Are you sure you want to delete "${category?.name}"? All items in this category will be unlinked.`,
       [
@@ -876,7 +876,7 @@ export default function MenuCategoryDetailScreen() {
             deleteCategory(id ?? "", {
               onSuccess: () => router.back(),
               onError: () =>
-                Alert.alert("Error", "Failed to delete category. Try again."),
+                showAlert("Error", "Failed to delete category. Try again."),
             });
           },
         },
