@@ -57,11 +57,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const { mutateAsync: registerPushToken } = useRegisterPushToken();
   const { mutateAsync: updatePushToken } = useUpdatePushToken();
-  const { data: serverPushToken } = useGetPushToken();
+
+  const isAuthenticated = !!session;
+  const { data: serverPushToken } = useGetPushToken(isAuthenticated);
+
   const setManagingOrder = useSocketStore((state) => state.setManagingOrder);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Do not request or sync push tokens if the user is not logged in!
+    if (!isAuthenticated) return;
 
     const setupNotifications = async () => {
       try {
