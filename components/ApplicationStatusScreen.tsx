@@ -139,12 +139,12 @@ export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: P
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Application Status</Text>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <Text style={[styles.headerTitle, { color: '#FFFFFF' }]}>Application Status</Text>
                 <TouchableOpacity
                     style={[styles.refreshBtn, isRefreshing && styles.refreshBtnLoading]}
                     onPress={handleRefresh}
@@ -166,7 +166,7 @@ export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: P
                         <Ionicons 
                             name="refresh-outline" 
                             size={20} 
-                            color={isRefreshing ? Colors.primary : Colors.muted}
+                            color="#FFFFFF"
                         />
                     </Animated.View>
                 </TouchableOpacity>
@@ -320,10 +320,9 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        backgroundColor: Colors.background,
+        paddingBottom: 16,
+        borderBottomWidth: 0,
+        backgroundColor: Colors.primary,
     },
     headerTitle: {
         fontFamily: Fonts.brandBold,
@@ -334,9 +333,9 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 19,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.border,
+        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        borderWidth: 1.5,
+        borderColor: "rgba(255, 255, 255, 0.4)",
         justifyContent: "center",
         alignItems: "center",
     },
