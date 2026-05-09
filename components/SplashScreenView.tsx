@@ -51,7 +51,7 @@ export default function SplashScreenView({
                 useNativeDriver: true,
             }),
         ]).start(() => onFinish());
-    }, [logoOpacity, logoScale, onFinish, screenOpacity, taglineOpacity, textOpacity]);
+    }, []);
 
     return (
         <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     logo: {
-        width: 160,
-        height: 160,
+        width: 220,
+        height: 220,
     },
     appName: {
         fontFamily: Fonts.brandBlack,

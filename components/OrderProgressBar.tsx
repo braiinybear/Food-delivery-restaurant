@@ -1,6 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/typography';
 
 interface OrderProgressBarProps {
   status: string;
@@ -58,21 +60,21 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
   });
 
   const getStageColor = (index: number) => {
-    if (index < currentStageIndex) return '#4CAF50'; // Completed - green
-    if (index === currentStageIndex) return '#FF9800'; // Current - orange
-    return '#E0E0E0'; // Future - gray
+    if (index < currentStageIndex) return Colors.success; // Completed
+    if (index === currentStageIndex) return Colors.primary; // Current
+    return Colors.border; // Future
   };
 
   return (
     <View style={styles.container}>
       {/* Progress Background Bar */}
-      <View style={[styles.progressBarBackground, { height: config.height / 6 }]}>
+      <View style={[styles.progressBarBackground, { height: config.height / 8 }]}>
         <Animated.View
           style={[
             styles.progressBarFill,
             {
               width: progressWidth,
-              backgroundColor: '#4CAF50',
+              backgroundColor: Colors.success,
               height: '100%',
             },
           ]}
@@ -92,19 +94,23 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
                 style={[
                   styles.stageIcon,
                   {
-                    width: config.iconSize * 1.5,
-                    height: config.iconSize * 1.5,
-                    borderRadius: config.iconSize * 0.75,
-                    backgroundColor: isCurrent ? color : isCompleted ? '#4CAF50' : '#f0f0f0',
+                    width: config.iconSize * 1.6,
+                    height: config.iconSize * 1.6,
+                    borderRadius: config.iconSize * 0.8,
+                    backgroundColor: isCurrent ? color : isCompleted ? Colors.success : Colors.surface,
                     borderWidth: isCurrent ? 2 : 0,
                     borderColor: color,
+                    shadowColor: color,
+                    shadowOpacity: isCurrent ? 0.3 : 0,
+                    shadowRadius: 4,
+                    elevation: isCurrent ? 2 : 0,
                   },
                 ]}
               >
                 <Ionicons
                   name={stage.icon}
                   size={config.iconSize}
-                  color={isCurrent || isCompleted ? 'white' : '#999'}
+                  color={isCurrent || isCompleted ? 'white' : Colors.muted}
                 />
               </View>
               {size !== 'small' && (
@@ -113,8 +119,8 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
                     styles.stageLabel,
                     {
                       fontSize: config.labelSize,
-                      color: isCurrent ? '#FF9800' : '#666',
-                      fontWeight: isCurrent ? '600' : '400',
+                      color: isCurrent ? color : Colors.textSecondary,
+                      fontFamily: isCurrent ? Fonts.brandBold : Fonts.brand,
                     },
                   ]}
                   numberOfLines={1}
@@ -129,7 +135,7 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
 
       {/* Current Status Text */}
       <Text style={styles.statusText}>
-        Current: <Text style={styles.statusBold}>{status.replace(/_/g, ' ')}</Text>
+        Current Status: <Text style={[styles.statusBold, { color: Colors.primary }]}>{status.replace(/_/g, ' ')}</Text>
       </Text>
     </View>
   );
@@ -141,12 +147,12 @@ const styles = StyleSheet.create({
   },
   progressBarBackground: {
     backgroundColor: '#f0f0f0',
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   progressBarFill: {
-    borderRadius: 4,
+    borderRadius: 6,
   },
   stagesContainer: {
     flexDirection: 'row',
@@ -165,15 +171,16 @@ const styles = StyleSheet.create({
   },
   stageLabel: {
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   statusText: {
     fontSize: 12,
+    fontFamily: Fonts.brand,
     color: '#666',
     textAlign: 'center',
+    marginTop: 8,
   },
   statusBold: {
-    fontWeight: '600',
-    color: '#FF9800',
+    fontFamily: Fonts.brandBold,
   },
 });

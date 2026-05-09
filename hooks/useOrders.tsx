@@ -81,52 +81,54 @@ export const useUpdateOrderStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: OrderStatus;
-    }) => updateOrderStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: OrderStatus }) => updateOrderStatus(id, status),
 
-    // ✅ After success → refetch fresh data
-    onSuccess: (updatedOrder) => {
-      try {
-        // seed single-order cache so modal shows updated data immediately
-        if ((updatedOrder as any)?.id) {
-          queryClient.setQueryData(["order", (updatedOrder as any).id], updatedOrder as any);
-          // remove from socket pending list if present
-          try {
-            useSocketStore.getState().removePendingOrder((updatedOrder as any).id);
-          } catch (e) {
-            // ignore
-          }
+    // ✅ OPTIMISTIC UPDATE: Instant UI transition
+    onMutate: async ({ id, status: newStatus }) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ["restaurant-orders"] });
+
+      // Snapshot the previous value
+      const previousOrders = queryClient.getQueriesData({ queryKey: ["restaurant-orders"] });
+
+      // Optimistically update to the new value
+      const queries = queryClient.getQueriesData({ queryKey: ["restaurant-orders"] });
+      queries.forEach(([queryKey, oldData]) => {
+        if (!oldData) return;
+        const statusInQuery = (queryKey as any)[3];
+        const page = oldData as any;
+        if (!page.data || !Array.isArray(page.data)) return;
+
+        const order = page.data.find((o: any) => o.id === id);
+        if (!order) return;
+
+        let newData;
+        if (statusInQuery === newStatus) {
+           newData = [{ ...order, status: newStatus }, ...page.data];
+        } else {
+           newData = page.data.filter((o: any) => o.id !== id);
         }
+        queryClient.setQueryData(queryKey, { ...page, data: newData });
+      });
 
-        // Merge the updated order into any cached restaurant-orders pages so UI updates instantly
-        const cached = queryClient.getQueriesData({ queryKey: ["restaurant-orders"] });
-        cached.forEach(([queryKey, value]) => {
-          if (!value) return;
-          const page = value as any;
-          if (!page || !Array.isArray(page.data)) return;
-          const exists = page.data.find((o: any) => o.id === (updatedOrder as any).id);
-          
-          let newData;
-          if (exists) {
-            newData = page.data.map((o: any) => 
-              o.id === (updatedOrder as any).id ? { ...o, ...updatedOrder } : o
-            );
-          } else {
-            newData = [{ ...updatedOrder }, ...page.data];
-          }
-          
-          queryClient.setQueryData(queryKey, { ...page, data: newData });
+      return { previousOrders };
+    },
+
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (err, variables, context) => {
+      if (context?.previousOrders) {
+        context.previousOrders.forEach(([queryKey, value]) => {
+          queryClient.setQueryData(queryKey, value);
         });
-      } catch (e) {
-        // fall back to invalidation if merging fails
-        console.warn('Failed to merge updated order into cache, invalidating instead', e);
-        queryClient.invalidateQueries({ predicate: query => query.queryKey[0] === 'restaurant-orders' });
       }
+    },
+
+    // Always refetch after error or success to guarantee sync with server
+    onSettled: (data) => {
+      if (data && (data as any).id) {
+         queryClient.setQueryData(["order", (data as any).id], data);
+      }
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
     },
   });
 };
@@ -135,7 +137,7 @@ export const bulkUpdateOrderStatus = async (
   orderIds: string[],
   status: OrderStatus
 ): Promise<any> => {
-  const { data } = await apiClient.patch(
+  const { data } = await apiClient.post(
     `/api/orders/bulk-status`,
     { orderIds, status }
   );
@@ -147,27 +149,53 @@ export const useBulkUpdateOrderStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      orderIds,
-      status,
-    }: {
-      orderIds: string[];
-      status: OrderStatus;
-    }) => bulkUpdateOrderStatus(orderIds, status),
+    mutationFn: ({ orderIds, status }: { orderIds: string[]; status: OrderStatus }) => 
+      bulkUpdateOrderStatus(orderIds, status),
 
-    onSuccess: (response: any) => {
-      // Invalidate all restaurant orders to reflect bulk changes
-      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
-      
-      // Also invalidate single order caches if necessary
-      if (response && Array.isArray(response.results)) {
-        response.results.forEach((order: any) => {
-          queryClient.invalidateQueries({ queryKey: ["order", order.id] });
-          try {
-            useSocketStore.getState().removePendingOrder(order.id);
-          } catch (e) {}
+    // ✅ OPTIMISTIC UPDATE: Instant UI transition for bulk
+    onMutate: async ({ orderIds, status: newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ["restaurant-orders"] });
+      const previousOrders = queryClient.getQueriesData({ queryKey: ["restaurant-orders"] });
+
+      const queries = queryClient.getQueriesData({ queryKey: ["restaurant-orders"] });
+      queries.forEach(([queryKey, oldData]) => {
+        if (!oldData) return;
+        const statusInQuery = (queryKey as any)[3];
+        const page = oldData as any;
+        if (!page.data || !Array.isArray(page.data)) return;
+
+        let newData = [...page.data];
+        let changed = false;
+
+        // If it's NOT the target status bucket, REMOVE all matching IDs
+        if (statusInQuery !== newStatus) {
+          const originalLength = newData.length;
+          newData = newData.filter(o => !orderIds.includes(o.id));
+          if (newData.length !== originalLength) changed = true;
+        } else {
+          // Note: We don't usually "add" to the next tab optimistically for bulk 
+          // because we don't have all the full order objects handy easily,
+          // but REMOVING from the current tab is what makes it feel fast!
+        }
+
+        if (changed) {
+          queryClient.setQueryData(queryKey, { ...page, data: newData });
+        }
+      });
+
+      return { previousOrders };
+    },
+
+    onError: (err, variables, context) => {
+      if (context?.previousOrders) {
+        context.previousOrders.forEach(([queryKey, value]) => {
+          queryClient.setQueryData(queryKey, value);
         });
       }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["restaurant-orders"] });
     },
   });
 };

@@ -84,7 +84,6 @@ export default function OrdersScreen() {
     const { data: response, isLoading, refetch } = useRestaurantOrders(page, 10, activeTab);
     const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
     const { mutate: bulkUpdateStatus, isPending: isBulkPending } = useBulkUpdateOrderStatus();
-    const { updateStatus: emitStatusUpdate } = useEmitOrderStatus();
     
     // ✅ Listen for real-time socket updates
     useSocketRestaurantOrders();
@@ -236,46 +235,58 @@ export default function OrdersScreen() {
             
             {/* NEW: Top Action Bar for Refresh & Status */}
             <View style={styles.topHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                     {isSelectionMode ? (
                         <View style={styles.selectionHeader}>
-                            <TouchableOpacity onPress={clearSelection}>
+                            <TouchableOpacity onPress={clearSelection} style={styles.closeIconBtn}>
                                 <Ionicons name="close" size={24} color={Colors.text} />
                             </TouchableOpacity>
                             <Text style={styles.selectionCountText}>
                                 {selectedOrderIds.length} Selected
                             </Text>
+                            <TouchableOpacity onPress={selectAll} style={styles.selectAllBtn}>
+                                <Text style={styles.selectAllText}>Select All</Text>
+                            </TouchableOpacity>
                         </View>
                     ) : (
-                        <View style={styles.statusRowHeader}>
-                            <View style={[
-                                styles.statusDotHeader, 
-                                { backgroundColor: isSocketConnected ? '#4CAF50' : '#F44336' }
-                            ]} />
-                            <Text style={styles.statusTextHeader}>
-                                {isSocketConnected ? 'Live' : 'Offline'}
-                            </Text>
+                        <View style={styles.headerTitleRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.instructionText}>Manage and track your live restaurant orders in real-time.</Text>
+                            </View>
+                            <View style={styles.statusGroup}>
+                                <View style={styles.liveStatusContainer}>
+                                    <View style={[
+                                        styles.statusDotHeader, 
+                                        { backgroundColor: isSocketConnected ? '#4CAF50' : '#F44336' }
+                                    ]} />
+                                    <Text style={styles.statusTextHeader}>
+                                        {isSocketConnected ? 'LIVE' : 'OFFLINE'}
+                                    </Text>
+                                </View>
+
+                                {!isSelectionMode && (
+                                    <TouchableOpacity 
+                                        onPress={handleRefresh}
+                                        disabled={isRefreshing}
+                                        style={styles.miniRefreshBtn}
+                                    >
+                                        <Animated.View style={{ 
+                                            transform: [{ 
+                                                rotate: spin 
+                                            }] 
+                                        }}>
+                                            <Ionicons 
+                                                name="refresh" 
+                                                size={16} 
+                                                color={Colors.primary} 
+                                            />
+                                        </Animated.View>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         </View>
                     )}
                 </View>
-                
-                <TouchableOpacity 
-                    onPress={handleRefresh}
-                    disabled={isRefreshing}
-                    style={styles.refreshIconButton}
-                >
-                    <Animated.View style={{ 
-                        transform: [{ 
-                            rotate: spin 
-                        }] 
-                    }}>
-                        <Ionicons 
-                            name="sync-outline" 
-                            size={24} 
-                            color={Colors.primary} 
-                        />
-                    </Animated.View>
-                </TouchableOpacity>
             </View>
 
             {/* Tabs - Sticky Header */}
@@ -445,13 +456,13 @@ export default function OrdersScreen() {
                                 {/* Statistics Row */}
                                 <View style={styles.statsRow}>
                                     <View style={styles.statItem}>
-                                        <Ionicons name="cash" size={14} color="#666" />
+                                        <Ionicons name="cash-outline" size={14} color={Colors.textSecondary} />
                                         <Text style={styles.statValue}>₹{order.totalAmount?.toFixed(0)}</Text>
                                     </View>
                                     <View style={styles.statDivider} />
                                     <View style={styles.statItem}>
-                                        <Ionicons name="wallet" size={14} color={order.isPaid ? "#4CAF50" : "#FF6B35"} />
-                                        <Text style={[styles.statValue, { color: order.isPaid ? "#4CAF50" : "#FF6B35" }]}>
+                                        <Ionicons name="wallet-outline" size={14} color={order.isPaid ? Colors.success : Colors.secondary} />
+                                        <Text style={[styles.statValue, { color: order.isPaid ? Colors.success : Colors.secondary }]}>
                                             {order.isPaid ? "Paid" : "Unpaid"}
                                         </Text>
                                     </View>
@@ -465,7 +476,6 @@ export default function OrdersScreen() {
                                                 key={idx}
                                                 onPress={() => {
                                                     updateStatus({ id: order.id, status: transition as OrderStatus });
-                                                    emitStatusUpdate(order.id, transition as OrderStatus);
                                                     console.log(`[Restaurant] Status updated: ${transition}`);
                                                 }}
                                                 style={[
@@ -501,37 +511,88 @@ export default function OrdersScreen() {
                 </ScrollView>
             )}
 
-            {/* Bulk Action Bar */}
+            {/* Bulk Action Bar - Premium Floating Design */}
             {isSelectionMode && (
-                <View style={styles.bulkActionBar}>
-                    <Text style={styles.tabText}>
-                        {selectedOrderIds.length} Selected
-                    </Text>
-                    <View style={styles.bulkActionButtons}>
-                        {activeTab === 'PLACED' && (
+                <View style={styles.bulkActionFloatingContainer}>
+                    <View style={styles.bulkActionBarPremium}>
+                        <View style={styles.bulkInfo}>
+                            <Text style={styles.bulkCountText}>{selectedOrderIds.length}</Text>
+                            <Text style={styles.bulkLabelText}>Selected</Text>
+                        </View>
+                        
+                        <View style={styles.bulkActionsRow}>
+                            {activeTab === 'PLACED' && (
+                                <TouchableOpacity 
+                                    style={styles.premiumBulkBtn}
+                                    onPress={() => handleBulkStatusUpdate('ACCEPTED')}
+                                    disabled={isBulkPending}
+                                >
+                                    {isBulkPending ? (
+                                        <ActivityIndicator size="small" color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="checkmark-done" size={18} color={Colors.white} />
+                                            <Text style={styles.premiumBulkBtnText}>Accept</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            {activeTab === 'ACCEPTED' && (
+                                <TouchableOpacity 
+                                    style={styles.premiumBulkBtn}
+                                    onPress={() => handleBulkStatusUpdate('PREPARING')}
+                                    disabled={isBulkPending}
+                                >
+                                    {isBulkPending ? (
+                                        <ActivityIndicator size="small" color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="flame" size={18} color={Colors.white} />
+                                            <Text style={styles.premiumBulkBtnText}>Prepare</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            {activeTab === 'PREPARING' && (
+                                <TouchableOpacity 
+                                    style={styles.premiumBulkBtn}
+                                    onPress={() => handleBulkStatusUpdate('READY')}
+                                    disabled={isBulkPending}
+                                >
+                                    {isBulkPending ? (
+                                        <ActivityIndicator size="small" color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="bag-check" size={18} color={Colors.white} />
+                                            <Text style={styles.premiumBulkBtnText}>Ready</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            {activeTab === 'READY' && (
+                                <TouchableOpacity 
+                                    style={styles.premiumBulkBtn}
+                                    onPress={() => handleBulkStatusUpdate('PICKED_UP')}
+                                    disabled={isBulkPending}
+                                >
+                                    {isBulkPending ? (
+                                        <ActivityIndicator size="small" color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="bicycle" size={18} color={Colors.white} />
+                                            <Text style={styles.premiumBulkBtnText}>Picked Up</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            
                             <TouchableOpacity 
-                                style={styles.bulkActionButton}
-                                onPress={() => handleBulkStatusUpdate('ACCEPTED')}
-                                disabled={isBulkPending}
+                                style={styles.bulkCloseBtn}
+                                onPress={clearSelection}
                             >
-                                <Text style={styles.bulkActionButtonText}>Accept All</Text>
+                                <Ionicons name="close" size={20} color={Colors.textSecondary} />
                             </TouchableOpacity>
-                        )}
-                        {activeTab === 'PREPARING' && (
-                            <TouchableOpacity 
-                                style={styles.bulkActionButton}
-                                onPress={() => handleBulkStatusUpdate('READY')}
-                                disabled={isBulkPending}
-                            >
-                                <Text style={styles.bulkActionButtonText}>Mark Ready</Text>
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity 
-                            style={styles.bulkActionCancel}
-                            onPress={clearSelection}
-                        >
-                            <Ionicons name="close-circle" size={28} color={Colors.white} />
-                        </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             )}
@@ -644,7 +705,6 @@ export default function OrdersScreen() {
                                                     key={idx}
                                                     onPress={() => {
                                                         updateStatus({ id: selectedOrder.id, status: transition as OrderStatus });
-                                                        emitStatusUpdate(selectedOrder.id, transition as OrderStatus);
                                                         console.log(`[Restaurant] Status updated to: ${transition}`);
                                                         setSelectedOrderId(null);
                                                     }}
@@ -670,7 +730,7 @@ export default function OrdersScreen() {
                                 {/* Customer Section - Premium Card */}
                                 <View style={[styles.premiumSection]}>
                                     <View style={styles.sectionHeaderRow}>
-                                        <Ionicons name="person-circle" size={20} color="#FF6B35" />
+                                        <Ionicons name="person-circle" size={20} color={Colors.primary} />
                                         <Text style={styles.premiumSectionHeader}>Customer Details</Text>
                                     </View>
                                     <View style={styles.customerCard}>
@@ -777,11 +837,11 @@ export default function OrdersScreen() {
                                                 <Ionicons 
                                                     name={selectedOrder.isPaid ? "checkmark-circle" : "alert-circle"} 
                                                     size={14} 
-                                                    color={selectedOrder.isPaid ? '#4CAF50' : '#FF6B35'}
+                                                    color={selectedOrder.isPaid ? '#4CAF50' : Colors.primary}
                                                 />
                                                 <Text style={[
                                                     styles.paymentText,
-                                                    { color: selectedOrder.isPaid ? '#4CAF50' : '#FF6B35' }
+                                                    { color: selectedOrder.isPaid ? '#4CAF50' : Colors.primary }
                                                 ]}>
                                                     {selectedOrder.isPaid ? "Paid" : "Unpaid"}
                                                 </Text>
@@ -997,7 +1057,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
         backgroundColor: Colors.danger,
-        borderRadius: 8,
+        borderRadius: 12,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -1005,6 +1065,140 @@ const styles = StyleSheet.create({
         fontFamily: Fonts.brandBold,
         fontSize: FontSize.sm,
         color: Colors.white,
+    },
+
+    /* Header Redesign */
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    headerTitleText: {
+        fontSize: 24,
+        fontFamily: Fonts.brandBlack,
+        color: Colors.text,
+    },
+    instructionText: {
+        fontSize: 13,
+        fontFamily: Fonts.brandMedium,
+        color: Colors.textSecondary,
+        lineHeight: 18,
+    },
+    liveStatusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#F0F9F0',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E0F0E0',
+    },
+    statusGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    miniRefreshBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F5F5F5',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeIconBtn: {
+        padding: 4,
+    },
+    selectAllBtn: {
+        marginLeft: 'auto',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: Colors.primary + '15',
+        borderRadius: 10,
+    },
+    selectAllText: {
+        fontSize: 12,
+        fontFamily: Fonts.brandBold,
+        color: Colors.primary,
+    },
+
+    /* Bulk Action Bar Premium */
+    bulkActionFloatingContainer: {
+        position: 'absolute',
+        bottom: 100,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 10000,
+    },
+    bulkActionBarPremium: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        width: '90%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 10,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+        gap: 16,
+    },
+    bulkInfo: {
+        alignItems: 'center',
+        paddingRight: 16,
+        borderRightWidth: 1,
+        borderRightColor: '#F0F0F0',
+    },
+    bulkCountText: {
+        fontSize: 18,
+        fontFamily: Fonts.brandBlack,
+        color: Colors.primary,
+    },
+    bulkLabelText: {
+        fontSize: 10,
+        fontFamily: Fonts.brandBold,
+        color: Colors.textSecondary,
+        textTransform: 'uppercase',
+    },
+    bulkActionsRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    premiumBulkBtn: {
+        flex: 1,
+        backgroundColor: Colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 16,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    premiumBulkBtnText: {
+        fontSize: 14,
+        fontFamily: Fonts.brandBold,
+        color: Colors.white,
+    },
+    bulkCloseBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F5F5F5',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     /* Modal Background */
@@ -1024,14 +1218,14 @@ const styles = StyleSheet.create({
     /* ✨ PREMIUM ORDER CARD - Modern Design */
     premiumOrderCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        borderRadius: 18,
         overflow: 'hidden',
-        marginHorizontal: 12,
-        marginBottom: 12,
+        marginHorizontal: 16,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
         elevation: 3,
         borderWidth: 1,
         borderColor: '#F0F0F0',
@@ -1040,44 +1234,44 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 10,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        gap: 10,
+        gap: 12,
     },
     orderBadge: {
         borderLeftWidth: 4,
-        paddingLeft: 8,
-        paddingRight: 2,
+        paddingLeft: 10,
     },
     orderBadgeText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1A1A1A',
+        fontSize: 15,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     headerInfo: {
         flex: 1,
     },
     customerNameCard: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontSize: 14,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     orderTimeCard: {
-        fontSize: 11,
-        color: '#999',
+        fontSize: 12,
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
         marginTop: 2,
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
+        gap: 6,
+        paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
     },
@@ -1088,88 +1282,95 @@ const styles = StyleSheet.create({
     },
     statusPillText: {
         fontSize: 11,
-        fontWeight: '600',
+        fontFamily: Fonts.brandBold,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     cardSection: {
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
     },
     itemsSummary: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
     },
     itemsThumbnails: {
         flexDirection: 'row',
         alignItems: 'center',
-        width: 70,
+        position: 'relative',
+        width: 85,
     },
     itemThumbnail: {
-        width: 45,
-        height: 45,
-        borderRadius: 10,
+        width: 48,
+        height: 48,
+        borderRadius: 12,
         borderWidth: 2,
         borderColor: '#FFF',
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#F8F9FA',
     },
     moreItemsBadge: {
-        width: 35,
-        height: 35,
-        borderRadius: 10,
-        backgroundColor: '#FF6B35',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: Colors.secondary,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: -10,
+        position: 'absolute',
+        left: 30,
+        borderWidth: 2,
+        borderColor: '#FFF',
     },
     moreItemsText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#FFF',
+        fontSize: 12,
+        fontFamily: Fonts.brandBold,
+        color: Colors.white,
     },
     itemsText: {
         flex: 1,
     },
     itemsCountCard: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontSize: 14,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     itemsPreviewText: {
-        fontSize: 11,
-        color: '#999',
+        fontSize: 12,
+        fontFamily: Fonts.brand,
+        color: Colors.textSecondary,
         marginTop: 2,
     },
     statsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        backgroundColor: '#FAFAFA',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: '#FBFBFB',
         borderTopWidth: 1,
         borderTopColor: '#F0F0F0',
-        gap: 12,
+        gap: 16,
     },
     statItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
         flex: 1,
     },
     statValue: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontSize: 13,
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     statDivider: {
         width: 1,
         height: 16,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: '#E5E5E5',
     },
     quickActionsBar: {
         flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderTopWidth: 1,
         borderTopColor: '#F0F0F0',
     },
@@ -1177,22 +1378,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 5,
-        paddingVertical: 8,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
+        gap: 8,
+        paddingVertical: 10,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     quickActionText: {
-        fontSize: 11,
-        fontWeight: '600',
+        fontSize: 13,
+        fontFamily: Fonts.brandBold,
     },
     tapHint: {
-        fontSize: 10,
-        color: '#CCC',
+        fontSize: 11,
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
         textAlign: 'center',
-        paddingHorizontal: 14,
-        paddingBottom: 10,
+        paddingVertical: 10,
+        opacity: 0.7,
     },
 
     /* ✨ PREMIUM MODAL - Premium Order Details */
@@ -1258,11 +1462,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: '#FF6B35',
-        paddingVertical: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#FF6B35',
+        backgroundColor: Colors.primary,
+        paddingVertical: 14,
+        borderRadius: 16,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     largeBtnText: {
         fontSize: 13,
@@ -1342,9 +1549,9 @@ const styles = StyleSheet.create({
         color: '#999',
     },
     premiumItemTotal: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#FF6B35',
+        fontSize: 14,
+        fontFamily: Fonts.brandBold,
+        color: Colors.primary,
     },
     summaryContainer: {
         backgroundColor: '#FFFFFF',
@@ -1381,9 +1588,9 @@ const styles = StyleSheet.create({
         color: '#1A1A1A',
     },
     totalAmount: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: '#FF6B35',
+        fontSize: 18,
+        fontFamily: Fonts.brandBlack,
+        color: Colors.primary,
     },
     metaContainer: {
         backgroundColor: '#FFFFFF',

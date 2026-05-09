@@ -177,7 +177,7 @@ export default function StatsScreen() {
                                                     height: Math.max(h, 4),
                                                     backgroundColor: isHighest
                                                         ? Colors.primary
-                                                        : "#D4A96A",
+                                                        : Colors.primary.slice(0, 7) + "40",
                                                 },
                                             ]}
                                         />
@@ -208,7 +208,7 @@ export default function StatsScreen() {
                                 <View key={item.label} style={styles.breakdownItem}>
                                     <View style={[
                                         styles.breakdownIcon,
-                                        { backgroundColor: (PAYMENT_COLORS[item.label] || Colors.primary) + "22" }
+                                        { backgroundColor: (PAYMENT_COLORS[item.label] || Colors.primary).slice(0, 7) + "22" }
                                     ]}>
                                         <Ionicons
                                             name={PAYMENT_ICONS[item.label] || "ellipse-outline"}

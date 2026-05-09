@@ -1,6 +1,5 @@
 import { Colors } from "@/constants/colors";
-import { Fonts } from "@/constants/theme";
-import { FontSize } from "@/constants/typography";
+import { Fonts, FontSize } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -146,13 +145,13 @@ const welcomeStyles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: Colors.white,
-        borderRadius: 16,
+        borderRadius: 18,
         padding: 16,
         marginBottom: 12,
         gap: 14,
         shadowColor: "#000",
         shadowOpacity: 0.04,
-        shadowRadius: 6,
+        shadowRadius: 8,
         shadowOffset: { width: 0, height: 2 },
         elevation: 2,
         borderWidth: 1,
@@ -183,7 +182,7 @@ const welcomeStyles = StyleSheet.create({
     statsStrip: {
         flexDirection: "row",
         backgroundColor: Colors.white,
-        borderRadius: 16,
+        borderRadius: 18,
         padding: 18,
         marginBottom: 24,
         marginTop: 8,
@@ -191,6 +190,11 @@ const welcomeStyles = StyleSheet.create({
         alignItems: "center",
         borderWidth: 1,
         borderColor: Colors.border,
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     stat: {
         alignItems: "center",

@@ -25,6 +25,8 @@ import { Fonts, FontSize } from "@/constants/typography";
 import { getPlaceholderImage } from "@/constants/images";
 import { Restaurant } from "@/types/restaurant";
 import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 
 // ─── Cuisine Options ─────────────────────────────────────────────────────────
 const CUISINE_OPTIONS = [
@@ -331,6 +333,89 @@ function EditRestaurantModal({
   const [image, setImage] = useState(restaurant.image || "");
   const [showAddCuisine, setShowAddCuisine] = useState(false);
   const [customCuisine, setCustomCuisine] = useState("");
+  const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentUploadingItem, setCurrentUploadingItem] = useState<string>("");
+
+  const pickImage = async (setImageUrl: (url: string) => void, itemName: string) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: itemName === "Banner" ? [16, 9] : [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+
+        // ─── Validate image before uploading ─────────────────────────────
+        try {
+          await validateImage(imageUri, 5); // 5MB max
+        } catch (validationError) {
+          showAlert(
+            "Invalid Image",
+            validationError instanceof Error
+              ? validationError.message
+              : "Please select a valid image",
+          );
+          return;
+        }
+
+        // ─── Start cloudinary upload ────────────────────────────────
+        setCurrentUploadingItem(itemName);
+        setIsCloudinaryUploading(true);
+        setUploadProgress(0);
+
+        try {
+          // ─── Simulate progress (0% → 50%) ──────────────────────────
+          const progressInterval = setInterval(() => {
+            setUploadProgress((prev) => {
+              if (prev >= 50) {
+                clearInterval(progressInterval);
+                return prev;
+              }
+              return prev + Math.random() * 15;
+            });
+          }, 200);
+
+          // ─── Upload to Cloudinary ───────────────────────────────
+          const response = await uploadImageToCloudinary(imageUri, "restaurant_uploads");
+
+          clearInterval(progressInterval);
+          setUploadProgress(100);
+
+          // ─── Store the secure URL ──────────────────────────────
+          setImageUrl(response.secure_url);
+
+          // ─── Show success message ──────────────────────────────
+          showAlert(
+            "Success! ✅",
+            `${itemName} uploaded to cloud successfully`,
+            [{ text: "OK" }],
+          );
+        } catch (uploadError) {
+          showAlert(
+            "Upload Failed ❌",
+            uploadError instanceof Error
+              ? uploadError.message
+              : `Failed to upload ${itemName}`,
+            [{ text: "Try Again" }],
+          );
+        } finally {
+          setIsCloudinaryUploading(false);
+          setUploadProgress(0);
+          setCurrentUploadingItem("");
+        }
+      }
+    } catch (error) {
+      showAlert(
+        "Error",
+        error instanceof Error ? error.message : "An error occurred",
+        [{ text: "OK" }],
+      );
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -591,18 +676,56 @@ function EditRestaurantModal({
               autoCapitalize="characters"
             />
 
-            {/* Image URL */}
-            <Text style={modalStyles.inputLabel}>Image URL</Text>
-            <TextInput
-              style={modalStyles.input}
-              value={image}
-              onChangeText={setImage}
-              placeholder="https://example.com/photo.jpg"
-              placeholderTextColor={Colors.muted}
-              autoCapitalize="none"
-              keyboardType="url"
+            {/* Media Upload Section */}
+            <Text style={modalStyles.inputLabel}>Restaurant Media</Text>
+            <ImageUploadCard
+              icon="image-outline"
+              title="Restaurant Image"
+              subtitle="Main image shown to customers (max 5MB)"
+              imageUrl={image}
+              isLoading={isCloudinaryUploading}
+              onPress={() => pickImage(setImage, "Restaurant Image")}
             />
           </ScrollView>
+
+          {/* Cloudinary Upload Loading Overlay */}
+          {isCloudinaryUploading && (
+            <View style={modalStyles.uploadingOverlay}>
+              <View style={modalStyles.uploadingModal}>
+                <View style={modalStyles.uploadingIcon}>
+                  <Ionicons name="cloud-upload-outline" size={42} color={Colors.primary} />
+                </View>
+                <Text style={modalStyles.uploadingTitle}>Uploading to Cloud</Text>
+                <Text style={modalStyles.uploadingSubtitle}>
+                  Uploading {currentUploadingItem}...
+                </Text>
+
+                {/* Progress Bar */}
+                <View style={modalStyles.progressBarContainer}>
+                  <View style={modalStyles.progressBarBackground}>
+                    <View
+                      style={[
+                        modalStyles.progressBarFill,
+                        { width: `${Math.min(uploadProgress, 99)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={modalStyles.progressPercentage}>
+                    {Math.round(Math.min(uploadProgress, 99))}%
+                  </Text>
+                </View>
+
+                {/* Loading Spinner */}
+                <View style={modalStyles.loadingSpinnerContainer}>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+
+                <Text style={modalStyles.uploadingHint}>
+                  This typically takes 5-15 seconds
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Actions */}
           <View style={modalStyles.actions}>
@@ -880,6 +1003,68 @@ const styles = StyleSheet.create({
   },
 });
 
+// ─── Reusable Image Upload Card ───────────────────────────────────────────────
+function ImageUploadCard({
+  icon,
+  title,
+  subtitle,
+  imageUrl,
+  isLoading,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  isLoading: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[modalStyles.uploadCard, imageUrl && modalStyles.uploadCardUploaded]}
+      onPress={onPress}
+      disabled={isLoading}
+      activeOpacity={0.7}
+    >
+      {imageUrl ? (
+        <>
+          <Image
+            source={{ uri: imageUrl }}
+            style={modalStyles.uploadCardImage}
+          />
+          <View style={modalStyles.uploadCardOverlay}>
+            <Ionicons
+              name="camera"
+              size={22}
+              color={Colors.white}
+            />
+            <Text style={{ color: Colors.white, fontFamily: Fonts.brandBold, fontSize: 10, marginTop: 4 }}>Change Image</Text>
+          </View>
+        </>
+      ) : (
+        <View style={modalStyles.uploadCardContent}>
+          <View
+            style={[
+              modalStyles.uploadCardIcon,
+              imageUrl && modalStyles.uploadCardIconSuccess,
+            ]}
+          >
+            <Ionicons
+              name={imageUrl ? "checkmark" : icon}
+              size={24}
+              color={imageUrl ? Colors.white : Colors.primary}
+            />
+          </View>
+          <View style={modalStyles.uploadCardText}>
+            <Text style={modalStyles.uploadCardTitle}>{title}</Text>
+            <Text style={modalStyles.uploadCardSubtitle}>{subtitle}</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 // ─── Modal Styles ────────────────────────────────────────────────────────────
 const modalStyles = StyleSheet.create({
   overlay: {
@@ -1068,5 +1253,144 @@ const modalStyles = StyleSheet.create({
     fontFamily: Fonts.brandBold,
     fontWeight: "700",
     color: Colors.white,
+  },
+
+  // ─── Upload Styles ───────────────────────
+  uploadCard: {
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 4,
+    backgroundColor: Colors.surface,
+    borderStyle: "dashed",
+    overflow: "hidden",
+    minHeight: 110,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadCardUploaded: {
+    backgroundColor: Colors.primary + "05",
+    borderColor: Colors.primary,
+    borderStyle: "solid",
+  },
+  uploadCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+  },
+  uploadCardImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 12,
+  },
+  uploadCardOverlay: {
+    position: "absolute",
+    width: "100%",
+    height: 140,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+  },
+  uploadCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.primary + "12",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadCardIconSuccess: {
+    backgroundColor: Colors.primary,
+  },
+  uploadCardText: {
+    flex: 1,
+  },
+  uploadCardTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: "600",
+    fontFamily: Fonts.brandBold,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  uploadCardSubtitle: {
+    fontSize: 10,
+    fontFamily: Fonts.brand,
+    color: Colors.textSecondary,
+  },
+
+  // Overlay
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  uploadingModal: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    width: "85%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  uploadingIcon: {
+    marginBottom: 16,
+  },
+  uploadingTitle: {
+    fontSize: 18,
+    fontFamily: Fonts.brandBlack,
+    color: Colors.text,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  uploadingSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontFamily: Fonts.brandMedium,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  progressBarContainer: {
+    width: "100%",
+    marginBottom: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  progressBarBackground: {
+    width: "100%",
+    height: 8,
+    backgroundColor: Colors.light,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: Colors.primary,
+  },
+  progressPercentage: {
+    fontFamily: Fonts.brandBold,
+    fontSize: 13,
+    color: Colors.primary,
+  },
+  loadingSpinnerContainer: {
+    marginVertical: 12,
+  },
+  uploadingHint: {
+    fontSize: 11,
+    fontFamily: Fonts.brand,
+    color: Colors.muted,
+    textAlign: "center",
+    marginTop: 8,
   },
 });

@@ -79,9 +79,7 @@ export default function TabsLayout() {
     const BackButton = () => (
     <TouchableOpacity
       onPress={() => {
-      
           router.back();
-        
       }}
       activeOpacity={0.7}
       style={{ paddingLeft: 8, paddingRight: 12, height: 44, justifyContent: 'center' }}
@@ -89,6 +87,7 @@ export default function TabsLayout() {
       <Ionicons name="arrow-back" size={28} color={Colors.white} />
     </TouchableOpacity>
   );
+
     useEffect(() => {
         if (Platform.OS !== "android") {
             return;
@@ -115,14 +114,14 @@ export default function TabsLayout() {
                 tabBarStyle: {
                     backgroundColor: Colors.primary,
                     borderTopWidth: 0,
-                    height: 64 + insets.bottom,
-                    paddingBottom: 10 + insets.bottom,
+                    height: 58 + insets.bottom,
+                    paddingBottom: insets.bottom,
                     paddingTop: 6,
-                    elevation: 8,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: -2 },
-                    shadowOpacity: 0.06,
-                    shadowRadius: 8,
+                    elevation: 12,
+                    shadowColor: Colors.primary,
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 12,
                 },
                 tabBarLabelStyle: {
                     fontSize: 10,
