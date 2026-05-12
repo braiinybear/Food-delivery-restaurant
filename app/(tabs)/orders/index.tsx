@@ -394,7 +394,7 @@ export default function OrdersScreen() {
                                         </View>
                                         <View style={styles.headerInfo}>
                                             <Text style={styles.customerNameCard} numberOfLines={1}>
-                                                {order.customer?.name || "Customer"}
+                                                {(order as any).customerAddress?.receiverName || order.customer?.name || "Customer"}
                                             </Text>
                                             <Text style={styles.orderTimeCard}>
                                                 {formatTimeAgo(order.placedAt)}
@@ -736,7 +736,11 @@ export default function OrdersScreen() {
                                     <View style={styles.customerCard}>
                                         <View style={styles.customerRow}>
                                             <Text style={styles.customerLabel}>Name</Text>
-                                            <Text style={styles.customerValue}>{selectedOrder.customer?.name || "N/A"}</Text>
+                                            <Text style={styles.customerValue}>{(selectedOrder as any).customerAddress?.receiverName || selectedOrder.customer?.name || "N/A"}</Text>
+                                        </View>
+                                        <View style={[styles.customerRow, { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10, marginTop: 10 }]}>
+                                            <Text style={styles.customerLabel}>Phone</Text>
+                                            <Text style={styles.customerValue}>{(selectedOrder as any).customerAddress?.receiverPhone || (selectedOrder.customer as any)?.phoneNumber || "N/A"}</Text>
                                         </View>
                                         <View style={[styles.customerRow, { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10, marginTop: 10 }]}>
                                             <Text style={styles.customerLabel}>Email</Text>
