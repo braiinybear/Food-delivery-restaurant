@@ -11,7 +11,7 @@ import {
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import { useTheme } from "@/context/ThemeContext";
 import { FontSize, Fonts } from "@/constants/typography";
 import { RestaurantApplicationResponse } from "@/types/restaurantRegistration";
 import { authClient } from "@/lib/auth-client";
@@ -23,57 +23,62 @@ type Props = {
     onRefresh?: () => Promise<void>;
 };
 
-const STATUS_CONFIG = {
-    PENDING: {
-        icon: "time-outline" as const,
-        iconBg: "#FFF8E1",
-        iconColor: Colors.warning,
-        badgeBg: "#FFF3CD",
-        badgeText: Colors.warning,
-        badge: "UNDER REVIEW",
-        title: "Application Received!",
-        subtitle: "We're reviewing your restaurant details.",
-        bodyTitle: "What happens next?",
-        steps: [
-            { icon: "checkmark-circle" as const, color: Colors.success, text: "Application submitted successfully" },
-            { icon: "search" as const, color: Colors.warning, text: "Our team is verifying your details (24–48 hrs)" },
-            { icon: "storefront-outline" as const, color: Colors.muted, text: "Once approved, your dashboard unlocks" },
-        ],
-        accentColor: Colors.warning,
-    },
-    APPROVED: {
-        icon: "checkmark-circle" as const,
-        iconBg: "#E8F8F0",
-        iconColor: Colors.success,
-        badgeBg: "#D4EDDA",
-        badgeText: Colors.success,
-        badge: "APPROVED",
-        title: "You're a Partner!",
-        subtitle: "Your restaurant has been verified and approved.",
-        bodyTitle: "You're all set",
-        steps: [
-            { icon: "checkmark-circle" as const, color: Colors.success, text: "Restaurant verified & approved" },
-            { icon: "storefront" as const, color: Colors.success, text: "Your dashboard is now active" },
-            { icon: "rocket" as const, color: Colors.primary, text: "Start managing your menu & orders" },
-        ],
-        accentColor: Colors.success,
-    },
-    REJECTED: {
-        icon: "close-circle" as const,
-        iconBg: "#FEE2E2",
-        iconColor: Colors.danger,
-        badgeBg: "#FECACA",
-        badgeText: Colors.danger,
-        badge: "REJECTED",
-        title: "Application Rejected",
-        subtitle: "Your application could not be approved at this time.",
-        bodyTitle: "Reason for rejection",
-        steps: [],
-        accentColor: Colors.danger,
-    },
-} as const;
+
 
 export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: Props) => {
+    const { Colors, isDark } = useTheme();
+    const styles = React.useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+
+    const STATUS_CONFIG = {
+        PENDING: {
+            icon: "time-outline" as const,
+            iconBg: "#FFF8E1",
+            iconColor: Colors.warning,
+            badgeBg: "#FFF3CD",
+            badgeText: Colors.warning,
+            badge: "UNDER REVIEW",
+            title: "Application Received!",
+            subtitle: "We're reviewing your restaurant details.",
+            bodyTitle: "What happens next?",
+            steps: [
+                { icon: "checkmark-circle" as const, color: Colors.success, text: "Application submitted successfully" },
+                { icon: "search" as const, color: Colors.warning, text: "Our team is verifying your details (24–48 hrs)" },
+                { icon: "storefront-outline" as const, color: Colors.muted, text: "Once approved, your dashboard unlocks" },
+            ],
+            accentColor: Colors.warning,
+        },
+        APPROVED: {
+            icon: "checkmark-circle" as const,
+            iconBg: "#E8F8F0",
+            iconColor: Colors.success,
+            badgeBg: "#D4EDDA",
+            badgeText: Colors.success,
+            badge: "APPROVED",
+            title: "You're a Partner!",
+            subtitle: "Your restaurant has been verified and approved.",
+            bodyTitle: "You're all set",
+            steps: [
+                { icon: "checkmark-circle" as const, color: Colors.success, text: "Restaurant verified & approved" },
+                { icon: "storefront" as const, color: Colors.success, text: "Your dashboard is now active" },
+                { icon: "rocket" as const, color: Colors.primary, text: "Start managing your menu & orders" },
+            ],
+            accentColor: Colors.success,
+        },
+        REJECTED: {
+            icon: "close-circle" as const,
+            iconBg: "#FEE2E2",
+            iconColor: Colors.danger,
+            badgeBg: "#FECACA",
+            badgeText: Colors.danger,
+            badge: "REJECTED",
+            title: "Application Rejected",
+            subtitle: "Your application could not be approved at this time.",
+            bodyTitle: "Reason for rejection",
+            steps: [],
+            accentColor: Colors.danger,
+        },
+    } as const;
+
     const insets = useSafeAreaInsets();
     const { setAppliedForPartner } = usePartnerStore();
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -140,7 +145,7 @@ export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: P
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
 
             {/* Header */}
             <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -282,19 +287,23 @@ export const ApplicationStatusScreen = ({ application, isLoading, onRefresh }: P
     );
 };
 
-const DetailRow = ({ icon, label, value }: { icon: any; label: string; value?: string }) => (
-    <View style={styles.detailRow}>
-        <View style={styles.detailIconWrap}>
-            <Ionicons name={icon} size={16} color={Colors.primary} />
+const DetailRow = ({ icon, label, value }: { icon: any; label: string; value?: string }) => {
+    const { Colors, isDark } = useTheme();
+    const styles = React.useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+    return (
+        <View style={styles.detailRow}>
+            <View style={styles.detailIconWrap}>
+                <Ionicons name={icon} size={16} color={Colors.primary} />
+            </View>
+            <View style={styles.detailText}>
+                <Text style={styles.detailLabel}>{label}</Text>
+                <Text style={styles.detailValue}>{value ?? "—"}</Text>
+            </View>
         </View>
-        <View style={styles.detailText}>
-            <Text style={styles.detailLabel}>{label}</Text>
-            <Text style={styles.detailValue}>{value ?? "—"}</Text>
-        </View>
-    </View>
-);
+    );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
@@ -322,7 +331,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 0,
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.secondary,
     },
     headerTitle: {
         fontFamily: Fonts.brandBold,

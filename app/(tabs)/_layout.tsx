@@ -8,11 +8,23 @@ import { NewOrderToast } from "../../components/NewOrderToast";
 import { useNewOrderAlert } from "../../hooks/useNewOrderAlert";
 import { useAcceptOrder } from "../../hooks/useAcceptOrder";
 import { useSocketStore } from "../../store/useSocketStore";
+import { usePartnerStore } from "../../store/usePartner";
+import { useMyRestaurantApplication } from "../../hooks/useRestaurantPartnerRequest";
+import { authClient } from "../../lib/auth-client";
+import { AppUser } from "../../types/user";
 import { useTheme } from "../../context/ThemeContext";
 
 export default function TabsLayout() {
     const { Colors, isDark } = useTheme();
     const insets = useSafeAreaInsets();
+    const { appliedForPartner } = usePartnerStore();
+    const { data: session } = authClient.useSession();
+    const user = session?.user as AppUser | undefined;
+    const { data: application } = useMyRestaurantApplication();
+
+    const isPartner = user?.role === "RESTAURANT_MANAGER" || user?.role === "ADMIN" || application?.status === 'APPROVED';
+    const hideTabs = (session && !isPartner && !appliedForPartner) || (appliedForPartner);
+
     const [orderQueue, setOrderQueue] = React.useState<any[]>([]);
     const [acceptingOrderId, setAcceptingOrderId] = React.useState<string | null>(null);
     const { acceptOrder } = useAcceptOrder();
@@ -148,6 +160,19 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="home" color={color} size={size - 2} />
                     ),
+                    tabBarStyle: hideTabs ? { display: "none" } : {
+                        backgroundColor: Colors.background,
+                        borderTopWidth: 1,
+                        borderTopColor: Colors.border,
+                        height: 58 + insets.bottom,
+                        paddingBottom: insets.bottom,
+                        paddingTop: 6,
+                        elevation: 12,
+                        shadowColor: isDark ? Colors.secondary : "#000",
+                        shadowOffset: { width: 0, height: -4 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 12,
+                    }
                 }}
             />
             <Tabs.Screen

@@ -68,17 +68,18 @@ export default function HomeScreen() {
 
   // Wait for SecureStore hydration before reading persisted state
   if (!_hasHydrated) return null;
-  if (session && user?.role !== "RESTAURANT_MANAGER" && user?.role !== "ADMIN" && !appliedForPartner) {
+
+  const isPartner = user?.role === "RESTAURANT_MANAGER" || user?.role === "ADMIN" || application?.status === 'APPROVED';
+
+  if (session && !isPartner && !appliedForPartner) {
     return (
       <>
-        <Tabs.Screen options={{ tabBarStyle: { display: "none" } }} />
         <PartnerWelcomeScreen />
       </>
     );
   } else if (appliedForPartner) {
     return (
       <>
-        <Tabs.Screen options={{ tabBarStyle: { display: "none" } }} />
         <ApplicationStatusScreen 
           application={application}
           isLoading={applicationLoading}
@@ -89,6 +90,8 @@ export default function HomeScreen() {
       </>
     );
   }
+
+  // If applied but approved, or already a partner, show dashboard
 
   // Show tabbar for approved home screen
   return (

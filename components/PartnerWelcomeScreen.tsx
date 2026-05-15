@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/colors";
+import { useTheme } from "@/context/ThemeContext";
 import { Fonts, FontSize } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,8 @@ import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 
 
 // ─── Welcome / Partner Onboarding Screen ─────────────────────────────────────
 export function PartnerWelcomeScreen() {
+    const { Colors, isDark } = useTheme();
+    const welcomeStyles = React.useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
     const { data: session } = authClient.useSession();
     const firstName = session?.user?.name?.split(" ")[0] ?? "Chef";
 
@@ -101,13 +103,13 @@ export function PartnerWelcomeScreen() {
         </View>
     );
 }
-const welcomeStyles = StyleSheet.create({
+const createStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.surface,
     },
     topBg: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.secondary,
         paddingTop: 60,
         paddingBottom: 60,
         alignItems: "center",
@@ -202,7 +204,7 @@ const welcomeStyles = StyleSheet.create({
     statNum: {
         fontFamily: Fonts.brandBlack,
         fontSize: FontSize.xl,
-        color: Colors.primary,
+        color: Colors.secondary,
     },
     statLbl: {
         fontFamily: Fonts.brand,
@@ -241,6 +243,6 @@ const welcomeStyles = StyleSheet.create({
         fontFamily: Fonts.brand,
         fontSize: FontSize.xs,
         color: Colors.muted,
-        marginBottom: 20,
+        marginBottom: 40,
     },
 });
