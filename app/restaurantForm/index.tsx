@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     View,
     Text,
@@ -10,15 +10,19 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    StatusBar,
 } from "react-native";
 import { showAlert } from "@/store/useAlertStore";
 import { useSubmitRestaurantPartnerRequest } from "../../hooks/useRestaurantPartnerRequest";
-import { Colors } from "../../constants/colors";
+import { ThemeType } from "../../constants/colors";
 import { router } from "expo-router";
 import { usePartnerStore } from "@/store/usePartner";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useTheme } from "@/context/ThemeContext";
+import { Fonts } from "@/constants/typography";
+
 const CUISINE_OPTIONS = [
     "North Indian",
     "South Indian",
@@ -31,6 +35,9 @@ const CUISINE_OPTIONS = [
 ];
 
 export default function RestaurantForm() {
+    const { Colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+
     const [restaurantName, setRestaurantName] = useState("");
     const [description, setDescription] = useState("");
     const [address, setAddress] = useState("");
@@ -60,7 +67,6 @@ export default function RestaurantForm() {
             if (!result.canceled && result.assets[0]) {
                 const imageUri = result.assets[0].uri;
 
-                // ─── Validate image before uploading ─────────────────────────────
                 try {
                     await validateImage(imageUri, 5); // 5MB max
                 } catch (validationError) {
@@ -73,13 +79,11 @@ export default function RestaurantForm() {
                     return;
                 }
 
-                // ─── Start cloudinary upload ────────────────────────────────
                 setCurrentUploadingItem(itemName);
                 setIsCloudinaryUploading(true);
                 setUploadProgress(0);
 
                 try {
-                    // ─── Simulate progress (0% → 50%) ──────────────────────────
                     const progressInterval = setInterval(() => {
                         setUploadProgress((prev) => {
                             if (prev >= 50) {
@@ -90,16 +94,13 @@ export default function RestaurantForm() {
                         });
                     }, 200);
 
-                    // ─── Upload to Cloudinary ───────────────────────────────
                     const response = await uploadImageToCloudinary(imageUri, "restaurant_uploads");
 
                     clearInterval(progressInterval);
                     setUploadProgress(100);
 
-                    // ─── Store the secure URL ──────────────────────────────
                     setImageUrl(response.secure_url);
 
-                    // ─── Show success message ──────────────────────────────
                     showAlert(
                         "Success! ✅",
                         `${itemName} uploaded to cloud successfully`,
@@ -196,9 +197,10 @@ export default function RestaurantForm() {
 
     return (
         <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
             {/* Cloudinary Upload Loading Overlay */}
             {isCloudinaryUploading && (
                 <View style={styles.uploadingOverlay}>
@@ -259,6 +261,8 @@ export default function RestaurantForm() {
                         placeholder="e.g. Priya's Kitchen"
                         value={restaurantName}
                         onChangeText={setRestaurantName}
+                        Colors={Colors}
+                        styles={styles}
                     />
                     <InputField
                         label="Description"
@@ -267,12 +271,16 @@ export default function RestaurantForm() {
                         onChangeText={setDescription}
                         multiline
                         numberOfLines={3}
+                        Colors={Colors}
+                        styles={styles}
                     />
                     <InputField
                         label="Address"
                         placeholder="e.g. 123, MG Road, Delhi – 110001"
                         value={address}
                         onChangeText={setAddress}
+                        Colors={Colors}
+                        styles={styles}
                     />
                 </View>
 
@@ -311,6 +319,8 @@ export default function RestaurantForm() {
                         value={costForTwo}
                         onChangeText={setCostForTwo}
                         keyboardType="number-pad"
+                        Colors={Colors}
+                        styles={styles}
                     />
                     <InputField
                         label="FSSAI License Number"
@@ -318,6 +328,8 @@ export default function RestaurantForm() {
                         value={fssaiCode}
                         onChangeText={setFssaiCode}
                         keyboardType="number-pad"
+                        Colors={Colors}
+                        styles={styles}
                     />
                     <InputField
                         label="GST Number"
@@ -325,6 +337,8 @@ export default function RestaurantForm() {
                         value={gstNumber}
                         onChangeText={setGstNumber}
                         autoCapitalize="characters"
+                        Colors={Colors}
+                        styles={styles}
                     />
                 </View>
 
@@ -340,6 +354,8 @@ export default function RestaurantForm() {
                         imageUrl={logoUrl}
                         isLoading={isCloudinaryUploading}
                         onPress={() => pickImage(setLogoUrl, "Logo")}
+                        Colors={Colors}
+                        styles={styles}
                     />
 
                     {/* Banner Image */}
@@ -350,6 +366,8 @@ export default function RestaurantForm() {
                         imageUrl={bannerUrl}
                         isLoading={isCloudinaryUploading}
                         onPress={() => pickImage(setBannerUrl, "Banner")}
+                        Colors={Colors}
+                        styles={styles}
                     />
 
                     {/* FSSAI Document */}
@@ -360,6 +378,8 @@ export default function RestaurantForm() {
                         imageUrl={fssaiDocUrl}
                         isLoading={isCloudinaryUploading}
                         onPress={() => pickImage(setFssaiDocUrl, "FSSAI Document")}
+                        Colors={Colors}
+                        styles={styles}
                     />
                 </View>
 
@@ -392,6 +412,8 @@ function InputField({
     numberOfLines,
     keyboardType,
     autoCapitalize,
+    Colors,
+    styles,
 }: {
     label: string;
     placeholder: string;
@@ -401,6 +423,8 @@ function InputField({
     numberOfLines?: number;
     keyboardType?: any;
     autoCapitalize?: any;
+    Colors: ThemeType;
+    styles: any;
 }) {
     return (
         <View style={styles.inputGroup}>
@@ -428,6 +452,8 @@ function ImageUploadCard({
     imageUrl,
     isLoading,
     onPress,
+    Colors,
+    styles,
 }: {
     icon: keyof typeof Ionicons.glyphMap;
     title: string;
@@ -435,6 +461,8 @@ function ImageUploadCard({
     imageUrl: string;
     isLoading: boolean;
     onPress: () => void;
+    Colors: ThemeType;
+    styles: any;
 }) {
     return (
         <TouchableOpacity
@@ -482,10 +510,10 @@ function ImageUploadCard({
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
     },
     content: {
         padding: 16,
@@ -496,40 +524,38 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 26,
-        fontWeight: "800",
+        fontFamily: Fonts.brandBold,
         color: Colors.primary,
         marginBottom: 6,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: Colors.textSecondary,
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
         lineHeight: 20,
     },
     card: {
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.surface,
         borderRadius: 16,
         padding: 16,
         marginBottom: 16,
-        shadowColor: "#000",
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: Colors.border,
     },
     sectionLabel: {
-        fontSize: 13,
-        fontWeight: "700",
+        fontSize: 12,
+        fontFamily: Fonts.brandBold,
         color: Colors.muted,
         textTransform: "uppercase",
         letterSpacing: 0.8,
-        marginBottom: 12,
+        marginBottom: 16,
     },
     inputGroup: {
-        marginBottom: 12,
+        marginBottom: 16,
     },
     label: {
         fontSize: 13,
-        fontWeight: "600",
+        fontFamily: Fonts.brandMedium,
         color: Colors.text,
         marginBottom: 6,
     },
@@ -540,8 +566,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
         fontSize: 14,
+        fontFamily: Fonts.brand,
         color: Colors.text,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
     },
     inputMultiline: {
         height: 90,
@@ -562,7 +589,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1.5,
         borderColor: Colors.border,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
     },
     chipSelected: {
         backgroundColor: Colors.primary,
@@ -570,12 +597,12 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 13,
-        color: Colors.textSecondary,
-        fontWeight: "500",
+        fontFamily: Fonts.brandMedium,
+        color: Colors.muted,
     },
     chipTextSelected: {
         color: Colors.white,
-        fontWeight: "700",
+        fontFamily: Fonts.brandBold,
     },
     button: {
         backgroundColor: Colors.primary,
@@ -595,18 +622,18 @@ const styles = StyleSheet.create({
     buttonText: {
         color: Colors.white,
         fontSize: 16,
-        fontWeight: "800",
+        fontFamily: Fonts.brandBold,
         letterSpacing: 0.5,
     },
     uploadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 9999,
     },
     uploadingModal: {
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.surface,
         borderRadius: 20,
         paddingVertical: 40,
         paddingHorizontal: 30,
@@ -624,14 +651,15 @@ const styles = StyleSheet.create({
     },
     uploadingTitle: {
         fontSize: 18,
-        fontWeight: "800",
+        fontFamily: Fonts.brandBold,
         color: Colors.text,
         marginBottom: 8,
         textAlign: "center",
     },
     uploadingSubtitle: {
         fontSize: 13,
-        color: Colors.textSecondary,
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
         textAlign: "center",
         marginBottom: 20,
         lineHeight: 18,
@@ -645,7 +673,7 @@ const styles = StyleSheet.create({
     progressBarBackground: {
         width: "100%",
         height: 8,
-        backgroundColor: Colors.light,
+        backgroundColor: Colors.background,
         borderRadius: 4,
         overflow: "hidden",
     },
@@ -654,7 +682,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primary,
     },
     progressPercentage: {
-        fontWeight: "700",
+        fontFamily: Fonts.brandBold,
         fontSize: 13,
         color: Colors.primary,
     },
@@ -663,6 +691,7 @@ const styles = StyleSheet.create({
     },
     uploadingHint: {
         fontSize: 12,
+        fontFamily: Fonts.brand,
         color: Colors.muted,
         textAlign: "center",
         marginTop: 12,
@@ -673,7 +702,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 12,
         marginBottom: 12,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
         borderStyle: "dashed",
         overflow: "hidden",
         minHeight: 100,
@@ -681,7 +710,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     uploadCardUploaded: {
-        backgroundColor: "rgba(46, 204, 113, 0.05)",
         borderColor: Colors.primary,
         borderStyle: "solid",
     },
@@ -701,7 +729,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         width: "100%",
         height: 120,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(0, 0, 0, 0.4)",
         justifyContent: "center",
         alignItems: "center",
         borderRadius: 10,
@@ -710,7 +738,7 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 12,
-        backgroundColor: Colors.primaryLight,
+        backgroundColor: Colors.primary + "15",
         justifyContent: "center",
         alignItems: "center",
     },
@@ -721,13 +749,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     uploadCardTitle: {
-        fontSize: 13,
-        fontWeight: "600",
+        fontSize: 14,
+        fontFamily: Fonts.brandBold,
         color: Colors.text,
         marginBottom: 2,
     },
     uploadCardSubtitle: {
         fontSize: 12,
-        color: Colors.textSecondary,
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
     },
 });

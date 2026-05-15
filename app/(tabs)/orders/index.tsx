@@ -1,13 +1,14 @@
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { useRestaurantOrders, useUpdateOrderStatus, useBulkUpdateOrderStatus, getAllowedTransitions } from "@/hooks/useOrders";
 import { useSocketRestaurantOrders, useManageRestaurantOrder, useEmitOrderStatus } from "@/hooks/useSocketOrders";
 import { useSocketStore } from "@/store/useSocketStore";
 import { Ionicons } from "@expo/vector-icons";
 import { OrderProgressBar } from "@/components/OrderProgressBar";
-import React from "react";
+import React, { useMemo } from "react";
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Image, Pressable, Modal, Animated, Easing } from "react-native";
 import { OrderStatus } from "@/types/order";
+import { useTheme } from "@/context/ThemeContext";
 
 const STATUS_TABS = ["PLACED", "ACCEPTED", "PREPARING", "READY", "CANCELLED"];
 const TAB_LABELS = { PLACED: "Placed", ACCEPTED: "Accepted", PREPARING: "Preparing", READY: "Ready", CANCELLED: "Cancelled" };
@@ -19,7 +20,7 @@ const formatTransitionLabel = (transition: string): string => {
     .join(' ');
 };
 
-const getStatusColor = (status: string, Colors: any): string => {
+const getStatusColor = (status: string, Colors: ThemeType): string => {
     switch (status) {
         case "PLACED":
             return Colors.primary;
@@ -79,27 +80,25 @@ const formatItemsList = (items: any[]): string => {
 };
 
 export default function OrdersScreen() {
+    const { Colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
     const [activeTab, setActiveTab] = React.useState("PLACED");
     const [page, setPage] = React.useState(1);
     const { data: response, isLoading, refetch } = useRestaurantOrders(page, 10, activeTab);
     const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
     const { mutate: bulkUpdateStatus, isPending: isBulkPending } = useBulkUpdateOrderStatus();
     
-    // ✅ Listen for real-time socket updates
     useSocketRestaurantOrders();
     const managingOrderId = useSocketStore((state) => state.managingOrderId);
     const setManagingOrder = useSocketStore((state) => state.setManagingOrder);
 
-    // ✅ Join order tracking room when managing order
     useManageRestaurantOrder(managingOrderId);
     
-    // ✅ Properly extract orders from API response { data, meta }
     const ordersArray = React.useMemo(() => {
         if (!response?.data || !Array.isArray(response.data)) return [];
         return response.data;
     }, [response]);
 
-    // ✅ Extract pagination metadata from API response
     const pagination = React.useMemo(() => {
         if (!response?.meta) return { total: 0, page: 1, limit: 10, totalPages: 0 };
         return response.meta;
@@ -110,11 +109,9 @@ export default function OrdersScreen() {
     const isSelectionMode = selectedOrderIds.length > 0;
     const selectedOrder = ordersArray.find(o => o.id === selectedOrderId);
 
-        // Subscribe to socket pending orders so UI can refresh when new orders arrive
         const pendingOrders = useSocketStore(state => state.pendingOrders);
         const latestPendingIdRef = React.useRef<string | null>(null);
 
-        // When a new pending order arrives and we're viewing PLACED tab, refetch the list
         React.useEffect(() => {
             if (activeTab !== 'PLACED') return;
             if (!pendingOrders || pendingOrders.length === 0) return;
@@ -122,7 +119,6 @@ export default function OrdersScreen() {
             const latest = pendingOrders[0]?.orderId || null;
             if (!latest) return;
 
-            // If the latest pending order is different from previous, trigger refetch
             if (latest !== latestPendingIdRef.current) {
                 latestPendingIdRef.current = latest;
                 console.log('[Orders] Detected new pending order from socket, refetching orders');
@@ -130,40 +126,29 @@ export default function OrdersScreen() {
             }
         }, [pendingOrders, activeTab, refetch]);
 
-    // ✅ SYNC: When selectedOrderId changes, update socket store so socket room gets joined
     React.useEffect(() => {
       if (selectedOrderId) {
-        console.log(`[Orders] 📌 Opening order details for: ${selectedOrderId}`);
         setManagingOrder(selectedOrderId);
       } else {
-        console.log(`[Orders] 📌 Closed order details`);
         setManagingOrder(null);
       }
     }, [selectedOrderId, setManagingOrder]);
 
-    // ✅ DEEP LINK: When managingOrderId is set externally (e.g. notification tap),
-    //    auto-open the order modal by syncing selectedOrderId
     React.useEffect(() => {
       if (managingOrderId && managingOrderId !== selectedOrderId) {
-        console.log(`[Orders] 📲 Deep link: opening order from notification: ${managingOrderId}`);
         setSelectedOrderId(managingOrderId);
       }
     }, [managingOrderId]);
 
-    // ✅ RESET: Return to page 1 when tab changes
     React.useEffect(() => {
         setPage(1);
-        setSelectedOrderIds([]); // Clear selection when switching tabs for clarity
+        setSelectedOrderIds([]); 
     }, [activeTab]);
 
-    const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
     const spinAnim = React.useRef(new Animated.Value(0)).current;
 
     const handleRefresh = React.useCallback(async () => {
         setIsRefreshing(true);
-        setIsManualRefreshing(true);
-        
-        // Start spinning
         Animated.loop(
             Animated.timing(spinAnim, {
                 toValue: 1,
@@ -181,9 +166,7 @@ export default function OrdersScreen() {
             console.error("Error refreshing orders:", error);
         } finally {
             setIsRefreshing(false);
-            // Stop spinning after a small delay
             setTimeout(() => {
-                setIsManualRefreshing(false);
                 spinAnim.stopAnimation();
                 spinAnim.setValue(0);
             }, 600);
@@ -196,9 +179,7 @@ export default function OrdersScreen() {
     });
 
     const isSocketConnected = useSocketStore((state) => state.isConnected);
-
-    // const filtered = (ordersArray || []).filter(o => o.status === activeTab);
-    const filtered = ordersArray; // Data is now pre-filtered by backend!
+    const filtered = ordersArray; 
 
     const toggleSelection = React.useCallback((orderId: string) => {
         setSelectedOrderIds(prev => 
@@ -230,10 +211,9 @@ export default function OrdersScreen() {
     }, []);
 
     return (
-        <View style={[styles.container, { backgroundColor: Colors.background }]}>
-            <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <View style={styles.container}>
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
             
-            {/* NEW: Top Action Bar for Refresh & Status */}
             <View style={styles.topHeader}>
                 <View style={{ flex: 1 }}>
                     {isSelectionMode ? (
@@ -270,16 +250,8 @@ export default function OrdersScreen() {
                                         disabled={isRefreshing}
                                         style={styles.miniRefreshBtn}
                                     >
-                                        <Animated.View style={{ 
-                                            transform: [{ 
-                                                rotate: spin 
-                                            }] 
-                                        }}>
-                                            <Ionicons 
-                                                name="refresh" 
-                                                size={16} 
-                                                color={Colors.primary} 
-                                            />
+                                        <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                                            <Ionicons name="refresh" size={16} color={Colors.primary} />
                                         </Animated.View>
                                     </TouchableOpacity>
                                 )}
@@ -289,7 +261,6 @@ export default function OrdersScreen() {
                 </View>
             </View>
 
-            {/* Tabs - Sticky Header */}
             <View style={[styles.tabsWrapper, { zIndex: 1000 }]}>
                 <ScrollView
                     horizontal
@@ -303,13 +274,11 @@ export default function OrdersScreen() {
                         style={[
                             styles.tab,
                             { 
-                                backgroundColor: activeTab === tab ? Colors.primary : Colors.surface,
-                                borderColor: activeTab === tab ? Colors.primary : Colors.border
+                                backgroundColor: activeTab === tab ? Colors.primary : (isDark ? 'transparent' : Colors.surface),
+                                borderColor: activeTab === tab ? Colors.primary : (isDark ? 'transparent' : Colors.border)
                             }
                         ]}
-                        onPress={() => {
-                            setActiveTab(tab);
-                        }}
+                        onPress={() => setActiveTab(tab)}
                     >
                         <Text 
                             style={[
@@ -324,8 +293,6 @@ export default function OrdersScreen() {
                 </ScrollView>
             </View>
 
-
-
             {isLoading ? (
                 <View style={styles.loaderContainer}>
                     <ActivityIndicator size="large" color={Colors.primary} />
@@ -338,9 +305,8 @@ export default function OrdersScreen() {
             ) : (
                 <ScrollView
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={[styles.content, { marginBottom: 24, marginTop: 12 }]}
+                    contentContainerStyle={styles.content}
                     style={styles.contentScroll}
-                    scrollEventThrottle={16}
                     refreshControl={
                         <RefreshControl
                             refreshing={isRefreshing}
@@ -348,34 +314,26 @@ export default function OrdersScreen() {
                             tintColor={Colors.primary}
                             colors={[Colors.primary]}
                             progressBackgroundColor={Colors.surface}
-                            progressViewOffset={0}
                         />
                     }
                 >
                     {filtered.map((order) => {
                         const itemImages = order.items?.slice(0, 2).map((item: any) => item.menuItem?.image).filter(Boolean) || [];
-
                         const allowedTransitions = getAllowedTransitions(order.status as OrderStatus);
                         
                         return (
                             <Pressable 
                                 key={order.id}
                                 onPress={() => {
-                                    if (isSelectionMode) {
-                                        toggleSelection(order.id);
-                                    } else {
-                                        setSelectedOrderId(order.id);
-                                    }
+                                    if (isSelectionMode) toggleSelection(order.id);
+                                    else setSelectedOrderId(order.id);
                                 }}
                                 onLongPress={() => {
-                                    if (!isSelectionMode) {
-                                        toggleSelection(order.id);
-                                    }
+                                    if (!isSelectionMode) toggleSelection(order.id);
                                 }}
-                                style={({ pressed }) => [
+                                style={[
                                     styles.premiumOrderCard,
-                                    selectedOrderIds.includes(order.id) && styles.orderCardSelected,
-                                    { opacity: pressed ? 0.85 : 1 }
+                                    selectedOrderIds.includes(order.id) && styles.orderCardSelected
                                 ]}
                             >
                                 {selectedOrderIds.includes(order.id) && (
@@ -383,77 +341,47 @@ export default function OrdersScreen() {
                                         <Ionicons name="checkmark" size={16} color={Colors.white} />
                                     </View>
                                 )}
-                                {/* Top Header with Order ID and Status */}
                                 <View style={styles.cardHeader}>
                                     <View style={styles.headerLeft}>
-                                        <View style={[
-                                            styles.orderBadge,
-                                            { borderLeftColor: getStatusColor(order.status, Colors) }
-                                        ]}>
+                                        <View style={[styles.orderBadge, { borderLeftColor: getStatusColor(order.status, Colors) }]}>
                                             <Text style={styles.orderBadgeText}>#{order.id.slice(-6).toUpperCase()}</Text>
                                         </View>
                                         <View style={styles.headerInfo}>
                                             <Text style={styles.customerNameCard} numberOfLines={1}>
                                                 {(order as any).customerAddress?.receiverName || order.customer?.name || "Customer"}
                                             </Text>
-                                            <Text style={styles.orderTimeCard}>
-                                                {formatTimeAgo(order.placedAt)}
-                                            </Text>
+                                            <Text style={styles.orderTimeCard}>{formatTimeAgo(order.placedAt)}</Text>
                                         </View>
                                     </View>
-                                    <View style={[
-                                        styles.statusPill,
-                                        { backgroundColor: getStatusColor(order.status, Colors) + "15" }
-                                    ]}>
-                                        <View style={[
-                                            styles.statusDot,
-                                            { backgroundColor: getStatusColor(order.status, Colors) }
-                                        ]} />
-                                        <Text style={[
-                                            styles.statusPillText,
-                                            { color: getStatusColor(order.status, Colors) }
-                                        ]}>
+                                    <View style={[styles.statusPill, { backgroundColor: getStatusColor(order.status, Colors) + "15" }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: getStatusColor(order.status, Colors) }]} />
+                                        <Text style={[styles.statusPillText, { color: getStatusColor(order.status, Colors) }]}>
                                             {getStatusLabel(order.status)}
                                         </Text>
                                     </View>
                                 </View>
 
-                                {/* Items Summary */}
                                 <View style={styles.cardSection}>
                                     <View style={styles.itemsSummary}>
                                         {itemImages.length > 0 && (
                                             <View style={styles.itemsThumbnails}>
                                                 {itemImages.slice(0, 2).map((image: any, idx: number) => (
-                                                    <Image
-                                                        key={idx}
-                                                        source={{ uri: image }}
-                                                        style={[
-                                                            styles.itemThumbnail,
-                                                            { marginLeft: idx > 0 ? -8 : 0 }
-                                                        ]}
-                                                    />
+                                                    <Image key={idx} source={{ uri: image }} style={[styles.itemThumbnail, { marginLeft: idx > 0 ? -8 : 0 }]} />
                                                 ))}
                                                 {order.items?.length > 2 && (
                                                     <View style={styles.moreItemsBadge}>
-                                                        <Text style={styles.moreItemsText}>
-                                                            +{order.items.length - 2}
-                                                        </Text>
+                                                        <Text style={styles.moreItemsText}>+{order.items.length - 2}</Text>
                                                     </View>
                                                 )}
                                             </View>
                                         )}
                                         <View style={styles.itemsText}>
-                                            <Text style={styles.itemsCountCard}>
-                                                {order.items?.length || 0} item{order.items?.length !== 1 ? 's' : ''}
-                                            </Text>
-                                            <Text style={styles.itemsPreviewText} numberOfLines={1}>
-                                                {formatItemsList(order.items).substring(0, 50)}
-                                            </Text>
+                                            <Text style={styles.itemsCountCard}>{order.items?.length || 0} items</Text>
+                                            <Text style={styles.itemsPreviewText} numberOfLines={1}>{formatItemsList(order.items)}</Text>
                                         </View>
                                     </View>
                                 </View>
 
-                                {/* Statistics Row */}
                                 <View style={styles.statsRow}>
                                     <View style={styles.statItem}>
                                         <Ionicons name="cash-outline" size={14} color={Colors.textSecondary} />
@@ -468,50 +396,35 @@ export default function OrdersScreen() {
                                     </View>
                                 </View>
 
-                                {/* Quick Action Buttons - Only show if has transitions */}
                                 {allowedTransitions.length > 0 && (
                                     <View style={styles.quickActionsBar}>
                                         {allowedTransitions.slice(0, 2).map((transition, idx) => (
                                             <TouchableOpacity
                                                 key={idx}
-                                                onPress={() => {
-                                                    updateStatus({ id: order.id, status: transition as OrderStatus });
-                                                    console.log(`[Restaurant] Status updated: ${transition}`);
-                                                }}
+                                                onPress={() => updateStatus({ id: order.id, status: transition as OrderStatus })}
                                                 style={[
                                                     styles.quickActionBtn,
                                                     { 
-                                                        backgroundColor: idx === 0 ? getStatusColor(transition as any, Colors) : '#F5F5F5',
+                                                        backgroundColor: idx === 0 ? getStatusColor(transition as any, Colors) : Colors.surface,
                                                         flex: 1
                                                     }
                                                 ]}
                                                 disabled={isPending}
                                             >
-                                                <Ionicons 
-                                                    name={idx === 0 ? "arrow-forward" : "close"} 
-                                                    size={14} 
-                                                    color={idx === 0 ? '#FFF' : '#666'} 
-                                                />
-                                                <Text style={[
-                                                    styles.quickActionText,
-                                                    { color: idx === 0 ? '#FFF' : '#666' }
-                                                ]}>
+                                                <Ionicons name={idx === 0 ? "arrow-forward" : "close"} size={14} color={idx === 0 ? Colors.white : Colors.textSecondary} />
+                                                <Text style={[styles.quickActionText, { color: idx === 0 ? Colors.white : Colors.textSecondary }]}>
                                                     {formatTransitionLabel(transition).split(' ')[0]}
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
                                 )}
-
-                                {/* Tap to View Full Details */}
-                                <Text style={styles.tapHint}>Tap to view details</Text>
                             </Pressable>
                         );
                     })}
                 </ScrollView>
             )}
 
-            {/* Bulk Action Bar - Premium Floating Design */}
             {isSelectionMode && (
                 <View style={styles.bulkActionFloatingContainer}>
                     <View style={styles.bulkActionBarPremium}>
@@ -519,77 +432,13 @@ export default function OrdersScreen() {
                             <Text style={styles.bulkCountText}>{selectedOrderIds.length}</Text>
                             <Text style={styles.bulkLabelText}>Selected</Text>
                         </View>
-                        
                         <View style={styles.bulkActionsRow}>
                             {activeTab === 'PLACED' && (
-                                <TouchableOpacity 
-                                    style={styles.premiumBulkBtn}
-                                    onPress={() => handleBulkStatusUpdate('ACCEPTED')}
-                                    disabled={isBulkPending}
-                                >
-                                    {isBulkPending ? (
-                                        <ActivityIndicator size="small" color={Colors.white} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="checkmark-done" size={18} color={Colors.white} />
-                                            <Text style={styles.premiumBulkBtnText}>Accept</Text>
-                                        </>
-                                    )}
+                                <TouchableOpacity style={styles.premiumBulkBtn} onPress={() => handleBulkStatusUpdate('ACCEPTED')} disabled={isBulkPending}>
+                                    {isBulkPending ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.premiumBulkBtnText}>Accept</Text>}
                                 </TouchableOpacity>
                             )}
-                            {activeTab === 'ACCEPTED' && (
-                                <TouchableOpacity 
-                                    style={styles.premiumBulkBtn}
-                                    onPress={() => handleBulkStatusUpdate('PREPARING')}
-                                    disabled={isBulkPending}
-                                >
-                                    {isBulkPending ? (
-                                        <ActivityIndicator size="small" color={Colors.white} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="flame" size={18} color={Colors.white} />
-                                            <Text style={styles.premiumBulkBtnText}>Prepare</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                            {activeTab === 'PREPARING' && (
-                                <TouchableOpacity 
-                                    style={styles.premiumBulkBtn}
-                                    onPress={() => handleBulkStatusUpdate('READY')}
-                                    disabled={isBulkPending}
-                                >
-                                    {isBulkPending ? (
-                                        <ActivityIndicator size="small" color={Colors.white} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="bag-check" size={18} color={Colors.white} />
-                                            <Text style={styles.premiumBulkBtnText}>Ready</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                            {activeTab === 'READY' && (
-                                <TouchableOpacity 
-                                    style={styles.premiumBulkBtn}
-                                    onPress={() => handleBulkStatusUpdate('PICKED_UP')}
-                                    disabled={isBulkPending}
-                                >
-                                    {isBulkPending ? (
-                                        <ActivityIndicator size="small" color={Colors.white} />
-                                    ) : (
-                                        <>
-                                            <Ionicons name="bicycle" size={18} color={Colors.white} />
-                                            <Text style={styles.premiumBulkBtnText}>Picked Up</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                            
-                            <TouchableOpacity 
-                                style={styles.bulkCloseBtn}
-                                onPress={clearSelection}
-                            >
+                            <TouchableOpacity style={styles.bulkCloseBtn} onPress={clearSelection}>
                                 <Ionicons name="close" size={20} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
@@ -597,105 +446,24 @@ export default function OrdersScreen() {
                 </View>
             )}
 
-            {/* Pagination Bubbles with Arrows - Always Visible */}
-            {pagination.totalPages > 1 && (
-                <View style={styles.paginationBubbles}>
-                    {/* Previous Arrow */}
-                    <TouchableOpacity
-                        onPress={() => setPage(Math.max(1, page - 1))}
-                        disabled={page === 1 || isLoading}
-                        style={[styles.arrowButton, { opacity: page === 1 ? 0.3 : 1 }]}
-                    >
-                        <Ionicons 
-                            name="chevron-back" 
-                            size={18} 
-                            color={page === 1 ? Colors.muted : Colors.primary} 
-                        />
-                    </TouchableOpacity>
-
-                    {/* Page Bubbles */}
-                    {Array.from({ length: pagination.totalPages }).map((_, idx) => {
-                        const pageNum = idx + 1;
-                        const isActive = pageNum === page;
-                        return (
-                            <TouchableOpacity
-                                key={pageNum}
-                                onPress={() => setPage(pageNum)}
-                                disabled={isLoading}
-                                style={[
-                                    styles.bubbleButton,
-                                    {
-                                        backgroundColor: isActive ? Colors.primary : Colors.surface,
-                                        borderColor: isActive ? Colors.primary : Colors.border,
-                                        opacity: isLoading ? 0.6 : 1,
-                                    }
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.bubbleText,
-                                    { color: isActive ? Colors.white : Colors.text }
-                                ]}>
-                                    {pageNum}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-
-                    {/* Next Arrow */}
-                    <TouchableOpacity
-                        onPress={() => setPage(Math.min(pagination.totalPages, page + 1))}
-                        disabled={page >= pagination.totalPages || isLoading}
-                        style={[styles.arrowButton, { opacity: page >= pagination.totalPages ? 0.3 : 1 }]}
-                    >
-                        <Ionicons 
-                            name="chevron-forward" 
-                            size={18} 
-                            color={page >= pagination.totalPages ? Colors.muted : Colors.primary} 
-                        />
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            {/* Order Details Modal - Premium Design */}
-            <Modal
-                visible={selectedOrderId !== null}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSelectedOrderId(null)}
-            >
+            <Modal visible={selectedOrderId !== null} transparent animationType="slide" onRequestClose={() => setSelectedOrderId(null)}>
                 <View style={styles.modalBackground}>
-                    <View style={[styles.premiumModalContainer, { backgroundColor: Colors.background }]}>
-                        {/* Sticky Header */}
+                    <View style={styles.premiumModalContainer}>
                         <View style={[styles.premiumModalHeader, { backgroundColor: getStatusColor(selectedOrder?.status || 'PLACED', Colors) }]}>
-                            <TouchableOpacity onPress={() => setSelectedOrderId(null)}>
-                                <Ionicons name="chevron-back" size={28} color="#FFF" />
-                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setSelectedOrderId(null)}><Ionicons name="chevron-back" size={28} color="#FFF" /></TouchableOpacity>
                             <View style={styles.headerTitleSection}>
-                                <Text style={styles.premiumModalTitle}>
-                                    Order #{selectedOrder?.id.slice(-6).toUpperCase()}
-                                </Text>
-                                <Text style={styles.modalSubtitle}>
-                                    {selectedOrder?.customer?.name || "Customer Order"}
-                                </Text>
+                                <Text style={styles.premiumModalTitle}>Order #{selectedOrder?.id.slice(-6).toUpperCase()}</Text>
+                                <Text style={styles.modalSubtitle}>{selectedOrder?.customer?.name || "Customer Order"}</Text>
                             </View>
                             <View style={{ width: 28 }} />
                         </View>
 
                         {selectedOrder && (
-                            <ScrollView
-                                style={styles.premiumModalContent}
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={{ paddingBottom: 24 }}
-                            >
-                                {/* ✅ ORDER PROGRESS BAR - Enhanced */}
-                                <View style={[styles.progressContainer, { backgroundColor: Colors.surface }]}>
-                                    <OrderProgressBar
-                                        status={selectedOrder.status as any}
-                                        size="large"
-                                    />
+                            <ScrollView style={styles.premiumModalContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                                <View style={styles.progressContainer}>
+                                    <OrderProgressBar status={selectedOrder.status as any} size="large" />
                                 </View>
 
-                                {/* Status Actions - Currently Highlighted */}
                                 {getAllowedTransitions(selectedOrder.status as OrderStatus).length > 0 && (
                                     <View style={styles.statusActionContainer}>
                                         <Text style={styles.actionLabel}>Next Action</Text>
@@ -703,32 +471,19 @@ export default function OrdersScreen() {
                                             {getAllowedTransitions(selectedOrder.status as OrderStatus).map((transition, idx) => (
                                                 <TouchableOpacity
                                                     key={idx}
-                                                    onPress={() => {
-                                                        updateStatus({ id: selectedOrder.id, status: transition as OrderStatus });
-                                                        console.log(`[Restaurant] Status updated to: ${transition}`);
-                                                        setSelectedOrderId(null);
-                                                    }}
+                                                    onPress={() => { updateStatus({ id: selectedOrder.id, status: transition as OrderStatus }); setSelectedOrderId(null); }}
                                                     disabled={isPending}
-                                                    style={[
-                                                        styles.largePrimaryBtn,
-                                                        { 
-                                                            flex: 1,
-                                                            opacity: isPending ? 0.6 : 1
-                                                        }
-                                                    ]}
+                                                    style={[styles.largePrimaryBtn, { backgroundColor: getStatusColor(transition as any, Colors) }]}
                                                 >
                                                     <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-                                                    <Text style={styles.largeBtnText}>
-                                                        {formatTransitionLabel(transition)}
-                                                    </Text>
+                                                    <Text style={styles.largeBtnText}>{formatTransitionLabel(transition)}</Text>
                                                 </TouchableOpacity>
                                             ))}
                                         </View>
                                     </View>
                                 )}
 
-                                {/* Customer Section - Premium Card */}
-                                <View style={[styles.premiumSection]}>
+                                <View style={styles.premiumSection}>
                                     <View style={styles.sectionHeaderRow}>
                                         <Ionicons name="person-circle" size={20} color={Colors.primary} />
                                         <Text style={styles.premiumSectionHeader}>Customer Details</Text>
@@ -738,118 +493,9 @@ export default function OrdersScreen() {
                                             <Text style={styles.customerLabel}>Name</Text>
                                             <Text style={styles.customerValue}>{(selectedOrder as any).customerAddress?.receiverName || selectedOrder.customer?.name || "N/A"}</Text>
                                         </View>
-                                        <View style={[styles.customerRow, { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10, marginTop: 10 }]}>
+                                        <View style={styles.customerRowSeparator}>
                                             <Text style={styles.customerLabel}>Phone</Text>
                                             <Text style={styles.customerValue}>{(selectedOrder as any).customerAddress?.receiverPhone || (selectedOrder.customer as any)?.phoneNumber || "N/A"}</Text>
-                                        </View>
-                                        <View style={[styles.customerRow, { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10, marginTop: 10 }]}>
-                                            <Text style={styles.customerLabel}>Email</Text>
-                                            <Text style={styles.customerValue}>{selectedOrder.customer?.email || "N/A"}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Items Section with Beautiful List */}
-                                <View style={[styles.premiumSection]}>
-                                    <View style={styles.sectionHeaderRow}>
-                                        <Ionicons name="restaurant" size={20} color="#FF9800" />
-                                        <Text style={styles.premiumSectionHeader}>Order Items</Text>
-                                    </View>
-                                    <View style={styles.itemsListContainer}>
-                                        {selectedOrder.items?.map((item: any, idx: number) => (
-                                            <View key={idx} style={[
-                                                styles.premiumItemRow,
-                                                { borderBottomWidth: idx < (selectedOrder.items?.length || 0) - 1 ? 1 : 0 }
-                                            ]}>
-                                                {item.menuItem?.image && (
-                                                    <Image
-                                                        source={{ uri: item.menuItem.image }}
-                                                        style={styles.premiumItemImage}
-                                                    />
-                                                )}
-                                                <View style={styles.premiumItemDetails}>
-                                                    <Text style={styles.premiumItemName}>
-                                                        {item.menuItem?.name || "Item"}
-                                                    </Text>
-                                                    <Text style={styles.premiumItemSpecs}>
-                                                        ₹{item.menuItem?.price || 0} × {item.quantity}
-                                                    </Text>
-                                                </View>
-                                                <Text style={styles.premiumItemTotal}>
-                                                    ₹{((item.menuItem?.price || 0) * item.quantity).toFixed(0)}
-                                                </Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                </View>
-
-                                {/* Order Summary - Premium */}
-                                <View style={[styles.premiumSection]}>
-                                    <View style={styles.sectionHeaderRow}>
-                                        <Ionicons name="calculator" size={20} color="#4CAF50" />
-                                        <Text style={styles.premiumSectionHeader}>Price Breakdown</Text>
-                                    </View>
-                                    <View style={styles.summaryContainer}>
-                                        <View style={styles.premiumSummaryRow}>
-                                            <Text style={styles.sumLabel}>Item Total</Text>
-                                            <Text style={styles.sumValue}>₹{selectedOrder.itemTotal.toFixed(0)}</Text>
-                                        </View>
-                                        {selectedOrder.tax && selectedOrder.tax > 0 && (
-                                            <View style={styles.premiumSummaryRow}>
-                                                <Text style={styles.sumLabel}>Tax</Text>
-                                                <Text style={styles.sumValue}>₹{selectedOrder.tax.toFixed(0)}</Text>
-                                            </View>
-                                        )}
-                                        {selectedOrder.deliveryCharge && selectedOrder.deliveryCharge > 0 && (
-                                            <View style={styles.premiumSummaryRow}>
-                                                <Text style={styles.sumLabel}>Delivery Fee</Text>
-                                                <Text style={styles.sumValue}>₹{selectedOrder.deliveryCharge.toFixed(0)}</Text>
-                                            </View>
-                                        )}
-                                        {selectedOrder.discount && selectedOrder.discount > 0 && (
-                                            <View style={styles.premiumSummaryRow}>
-                                                <Text style={[styles.sumLabel, { color: '#4CAF50' }]}>Discount</Text>
-                                                <Text style={[styles.sumValue, { color: '#4CAF50' }]}>-₹{selectedOrder.discount.toFixed(0)}</Text>
-                                            </View>
-                                        )}
-                                        <View style={[styles.premiumSummaryRow, styles.totalRow]}>
-                                            <Text style={styles.totalLabel}>Total Amount</Text>
-                                            <Text style={styles.totalAmount}>₹{selectedOrder.totalAmount.toFixed(0)}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* Order Meta Info */}
-                                <View style={[styles.premiumSection]}>
-                                    <View style={styles.sectionHeaderRow}>
-                                        <Ionicons name="information-circle" size={20} color="#2196F3" />
-                                        <Text style={styles.premiumSectionHeader}>Order Information</Text>
-                                    </View>
-                                    <View style={styles.metaContainer}>
-                                        <View style={styles.metaItem}>
-                                            <Text style={styles.metaLabel}>Placed At</Text>
-                                            <Text style={styles.metaValue}>
-                                                {new Date(selectedOrder.placedAt).toLocaleString()}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.metaItem}>
-                                            <Text style={styles.metaLabel}>Payment Status</Text>
-                                            <View style={[
-                                                styles.paymentBadge,
-                                                { backgroundColor: selectedOrder.isPaid ? '#E8F5E9' : '#FFEBEE' }
-                                            ]}>
-                                                <Ionicons 
-                                                    name={selectedOrder.isPaid ? "checkmark-circle" : "alert-circle"} 
-                                                    size={14} 
-                                                    color={selectedOrder.isPaid ? '#4CAF50' : Colors.primary}
-                                                />
-                                                <Text style={[
-                                                    styles.paymentText,
-                                                    { color: selectedOrder.isPaid ? '#4CAF50' : Colors.primary }
-                                                ]}>
-                                                    {selectedOrder.isPaid ? "Paid" : "Unpaid"}
-                                                </Text>
-                                            </View>
                                         </View>
                                     </View>
                                 </View>
@@ -862,11 +508,8 @@ export default function OrdersScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { 
-        flex: 1,
-        backgroundColor: Colors.background,
-    },
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
     topHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -874,7 +517,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 16,
         paddingBottom: 12,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
     },
     headerTitle: {
         fontSize: 24,
@@ -901,7 +544,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: '#F0F0F0',
+        backgroundColor: Colors.background,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -917,7 +560,7 @@ const styles = StyleSheet.create({
     },
     bulkActionBar: {
         position: 'absolute',
-        bottom: 90, // Move up a bit to clear system nav or bottom tabs
+        bottom: 90, 
         left: 20,
         right: 20,
         backgroundColor: Colors.primary,
@@ -931,7 +574,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 4.65,
         elevation: 10,
-        zIndex: 9999, // Ensure it is on top
+        zIndex: 9999, 
     },
     bulkActionButtons: {
         flexDirection: 'row',
@@ -954,7 +597,7 @@ const styles = StyleSheet.create({
     orderCardSelected: {
         borderColor: Colors.primary,
         borderWidth: 2,
-        backgroundColor: '#F0F7FF',
+        backgroundColor: Colors.primary + "08",
     },
     selectionIndicator: {
         position: 'absolute',
@@ -987,7 +630,7 @@ const styles = StyleSheet.create({
         color: Colors.muted,
     },
     tabsWrapper: {
-        backgroundColor: Colors.surface,
+        backgroundColor: isDark ? Colors.background : Colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
         paddingTop: 8,
@@ -1092,12 +735,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: '#F0F9F0',
+        backgroundColor: isDark ? Colors.background : Colors.success + '15',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: '#E0F0E0',
+        borderColor: isDark ? Colors.border : Colors.success + '30',
     },
     statusGroup: {
         flexDirection: 'row',
@@ -1108,7 +751,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: Colors.background,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1140,25 +783,25 @@ const styles = StyleSheet.create({
     bulkActionBarPremium: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.surface,
         borderRadius: 24,
         paddingHorizontal: 16,
         paddingVertical: 12,
         width: '90%',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.15,
+        shadowOpacity: isDark ? 0.4 : 0.15,
         shadowRadius: 20,
         elevation: 10,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        borderWidth: 1.5,
+        borderColor: Colors.border,
         gap: 16,
     },
     bulkInfo: {
         alignItems: 'center',
         paddingRight: 16,
         borderRightWidth: 1,
-        borderRightColor: '#F0F0F0',
+        borderRightColor: Colors.border,
     },
     bulkCountText: {
         fontSize: 18,
@@ -1194,13 +837,13 @@ const styles = StyleSheet.create({
     premiumBulkBtnText: {
         fontSize: 14,
         fontFamily: Fonts.brandBold,
-        color: Colors.white,
+        color: isDark ? Colors.background : Colors.white,
     },
     bulkCloseBtn: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: Colors.background,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1208,31 +851,31 @@ const styles = StyleSheet.create({
     /* Modal Background */
     modalBackground: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
         justifyContent: "flex-end",
     },
     orderCard: { /* deprecated - kept for backwards compatibility */
         borderRadius: 14,
         padding: 14,
-        borderWidth: 1,
+        borderWidth: 1.5,
         backgroundColor: Colors.surface,
         borderColor: Colors.border,
     },
 
     /* ✨ PREMIUM ORDER CARD - Modern Design */
     premiumOrderCard: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: Colors.surface,
         borderRadius: 18,
         overflow: 'hidden',
         marginHorizontal: 16,
         marginBottom: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
+        shadowOpacity: isDark ? 0.3 : 0.05,
         shadowRadius: 12,
         elevation: 3,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        borderWidth: 1.5,
+        borderColor: Colors.border,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -1310,8 +953,8 @@ const styles = StyleSheet.create({
         height: 48,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#FFF',
-        backgroundColor: '#F8F9FA',
+        borderColor: Colors.surface,
+        backgroundColor: Colors.background,
     },
     moreItemsBadge: {
         width: 40,
@@ -1323,7 +966,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 30,
         borderWidth: 2,
-        borderColor: '#FFF',
+        borderColor: Colors.surface,
     },
     moreItemsText: {
         fontSize: 12,
@@ -1349,9 +992,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: '#FBFBFB',
+        backgroundColor: Colors.background + "40",
         borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
+        borderTopColor: Colors.border,
         gap: 16,
     },
     statItem: {
@@ -1368,7 +1011,7 @@ const styles = StyleSheet.create({
     statDivider: {
         width: 1,
         height: 16,
-        backgroundColor: '#E5E5E5',
+        backgroundColor: Colors.border,
     },
     quickActionsBar: {
         flexDirection: 'row',
@@ -1376,7 +1019,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
+        borderTopColor: Colors.border,
     },
     quickActionBtn: {
         flexDirection: 'row',
@@ -1387,7 +1030,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: isDark ? 0.2 : 0.1,
         shadowRadius: 4,
     },
     quickActionText: {
@@ -1427,11 +1070,12 @@ const styles = StyleSheet.create({
     },
     premiumModalTitle: {
         fontSize: 20,
-        fontWeight: '700',
-        color: '#FFF',
+        fontFamily: Fonts.brandBold,
+        color: Colors.white,
     },
     modalSubtitle: {
         fontSize: 12,
+        fontFamily: Fonts.brand,
         color: 'rgba(255,255,255,0.8)',
         marginTop: 2,
     },
@@ -1442,10 +1086,11 @@ const styles = StyleSheet.create({
     },
     progressContainer: {
         backgroundColor: Colors.surface,
-        borderRadius: 14,
-        padding: 16,
+        borderRadius: 20,
+        padding: 20,
         marginVertical: 12,
-        marginHorizontal: 0,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
     },
     statusActionContainer: {
         paddingHorizontal: 0,
@@ -1453,8 +1098,8 @@ const styles = StyleSheet.create({
     },
     actionLabel: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
         marginBottom: 10,
     },
     actionButtonsGrid: {
@@ -1462,14 +1107,14 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     largePrimaryBtn: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        backgroundColor: Colors.primary,
         paddingVertical: 14,
         borderRadius: 16,
-        shadowColor: Colors.primary,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -1477,8 +1122,8 @@ const styles = StyleSheet.create({
     },
     largeBtnText: {
         fontSize: 13,
-        fontWeight: '700',
-        color: '#FFF',
+        fontFamily: Fonts.brandBold,
+        color: Colors.white,
     },
     premiumSection: {
         marginVertical: 8,
@@ -1491,14 +1136,14 @@ const styles = StyleSheet.create({
     },
     premiumSectionHeader: {
         fontSize: 15,
-        fontWeight: '700',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     customerCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
         overflow: 'hidden',
         paddingHorizontal: 14,
         paddingVertical: 12,
@@ -1508,21 +1153,30 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    customerRowSeparator: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: Colors.border,
+    },
     customerLabel: {
         fontSize: 12,
-        color: '#999',
-        fontWeight: '500',
+        color: Colors.muted,
+        fontFamily: Fonts.brandMedium,
     },
     customerValue: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     itemsListContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
         overflow: 'hidden',
     },
     premiumItemRow: {
@@ -1531,26 +1185,28 @@ const styles = StyleSheet.create({
         gap: 12,
         paddingHorizontal: 14,
         paddingVertical: 12,
-        borderBottomColor: '#F0F0F0',
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
     },
     premiumItemImage: {
         width: 60,
         height: 60,
         borderRadius: 10,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: Colors.background,
     },
     premiumItemDetails: {
         flex: 1,
     },
     premiumItemName: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
         marginBottom: 2,
     },
     premiumItemSpecs: {
         fontSize: 11,
-        color: '#999',
+        fontFamily: Fonts.brand,
+        color: Colors.muted,
     },
     premiumItemTotal: {
         fontSize: 14,
@@ -1558,10 +1214,10 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     summaryContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
@@ -1573,23 +1229,24 @@ const styles = StyleSheet.create({
     },
     sumLabel: {
         fontSize: 12,
-        color: '#666',
+        fontFamily: Fonts.brand,
+        color: Colors.textSecondary,
     },
     sumValue: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     totalRow: {
         paddingTop: 12,
         marginTop: 8,
         borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
+        borderTopColor: Colors.border,
     },
     totalLabel: {
         fontSize: 14,
-        fontWeight: '700',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     totalAmount: {
         fontSize: 18,
@@ -1597,31 +1254,31 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
     metaContainer: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#F0F0F0',
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
         overflow: 'hidden',
     },
     metaItem: {
         paddingHorizontal: 14,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: Colors.border,
     },
     metaItem_last: {
         borderBottomWidth: 0,
     },
     metaLabel: {
         fontSize: 12,
-        color: '#999',
-        fontWeight: '500',
+        color: Colors.muted,
+        fontFamily: Fonts.brandMedium,
         marginBottom: 4,
     },
     metaValue: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#1A1A1A',
+        fontFamily: Fonts.brandBold,
+        color: Colors.text,
     },
     paymentBadge: {
         flexDirection: 'row',
@@ -1635,7 +1292,7 @@ const styles = StyleSheet.create({
     },
     paymentText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: Fonts.brandBold,
     },
 
     /* Content Scroll */

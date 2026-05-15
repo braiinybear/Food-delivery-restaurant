@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, Tabs } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePartnerStore } from "@/store/usePartner";
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -14,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { PartnerWelcomeScreen } from "@/components/PartnerWelcomeScreen";
@@ -24,9 +25,11 @@ import {
 } from "@/hooks/useRestaurantPartnerRequest";
 import { ApplicationStatusScreen } from "@/components/ApplicationStatusScreen";
 import { AppUser } from "@/types/user";
+import { useTheme } from "@/context/ThemeContext";
 
 
 export default function HomeScreen() {
+  const { Colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { appliedForPartner, _hasHydrated } = usePartnerStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -37,6 +40,8 @@ export default function HomeScreen() {
   const { data: dashboard, isLoading: dashboardLoading, refetch: refetchDashboard } =
     useRestaurantDashboard();
   const [refreshing, setRefreshing] = useState(false);
+
+  const styles = useMemo(() => createStyles(Colors, isDark, insets), [Colors, isDark, insets]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -87,31 +92,8 @@ export default function HomeScreen() {
 
   // Show tabbar for approved home screen
   return (
-    <>
-      <Tabs.Screen
-        options={{
-          tabBarStyle: {
-            backgroundColor: Colors.primary,
-            borderTopWidth: 0,
-            height: 58 + insets.bottom,
-            paddingBottom: insets.bottom,
-            paddingTop: 6,
-            elevation: 12,
-            shadowColor: Colors.primary,
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-          },
-          tabBarActiveTintColor: Colors.white,
-          tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "600",
-            letterSpacing: 0.5,
-          },
-        }}
-      />
-     <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+    <View style={styles.container}>
+     <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -130,7 +112,7 @@ export default function HomeScreen() {
             <Ionicons
               name="notifications-outline"
               size={22}
-              color={Colors.text}
+              color={Colors.white}
             />
             <View style={styles.notiBadge} />
           </TouchableOpacity>
@@ -141,7 +123,7 @@ export default function HomeScreen() {
             <Ionicons
               name="person-circle-outline"
               size={24}
-              color={Colors.text}
+              color={Colors.white}
             />
           </TouchableOpacity>
         </View>
@@ -149,6 +131,7 @@ export default function HomeScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        style={{ flex: 1, backgroundColor: Colors.background }}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -304,7 +287,7 @@ export default function HomeScreen() {
        
       
       </ScrollView>
-    </>
+    </View>
   );
 }
 
@@ -320,6 +303,9 @@ function BreakdownItem({
   value: number;
   color: string;
 }) {
+  const { Colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(Colors, isDark, insets), [Colors, isDark, insets]);
   return (
     <View style={styles.breakdownItem}>
       <View
@@ -327,13 +313,13 @@ function BreakdownItem({
       >
         <Ionicons name={icon} size={18} color={color} />
       </View>
-      <Text style={styles.breakdownValue}>{value}</Text>
+      <Text style={[styles.breakdownValue, { color: Colors.text }]}>{value}</Text>
       <Text style={styles.breakdownLabel}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -343,9 +329,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 52,
-    paddingBottom: 16,
-    backgroundColor: Colors.primary,
+    paddingTop: Platform.OS === "ios" ? insets.top : Math.max(insets.top, 20),
+    paddingBottom: 20,
+    backgroundColor: isDark ? Colors.background : Colors.secondary,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   headerLeft: {
     flexDirection: "row",
@@ -356,25 +344,25 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.background,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.2 : 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   restaurantName: {
     fontFamily: Fonts.brandBold,
     fontSize: FontSize.md,
-    color: Colors.white,
+    color: isDark ? Colors.text : Colors.primary,
     letterSpacing: 0.3,
   },
   headerSubtitle: {
     fontFamily: Fonts.brand,
     fontSize: 10,
-    color: "rgba(255,255,255,0.7)",
+    color: isDark ? Colors.muted : "rgba(255,255,255,0.9)",
     letterSpacing: 1.5,
     marginTop: 1,
   },
@@ -386,7 +374,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: isDark ? Colors.background : "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
@@ -400,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: Colors.secondary,
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: isDark ? Colors.surface : Colors.primary,
   },
   scrollContent: {
     paddingTop: 20,
@@ -426,19 +414,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     gap: 6,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.border,
   },
   liveDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor:"red",
+    backgroundColor: Colors.danger,
   },
   liveText: {
     fontFamily: Fonts.brandBold,
     fontSize: 11,
-    color:"red",
+    color: Colors.danger,
     letterSpacing: 1,
   },
   statsRow: {
@@ -448,22 +436,21 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 24,
     padding: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.2 : 0.04,
+    shadowRadius: 10,
+    elevation: 3,
   },
   statCardPrimary: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.primary + "33",
   },
   statCardSecondary: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
     borderColor: Colors.border,
   },
   statCardHeader: {
@@ -517,26 +504,26 @@ const styles = StyleSheet.create({
   },
   quickActionCard: {
     flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
     paddingVertical: 20,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.3 : 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   quickActionIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -546,7 +533,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 22,
   },
-  // Dashboard loader
   dashboardLoader: {
     alignItems: "center",
     justifyContent: "center",
@@ -558,19 +544,18 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     marginTop: 10,
   },
-  // Breakdown card
   breakdownCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
     padding: 18,
     marginBottom: 20,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.3 : 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   breakdownTitle: {
     fontFamily: Fonts.brandBold,
@@ -610,51 +595,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.brand,
     fontSize: FontSize.xs,
     color: Colors.muted,
-  },
-  // Revenue banner card
-  revenueCard: {
-    backgroundColor: Colors.primary,
-    borderRadius: 20,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
-  },
-  revenueCardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  revenueCardInfo: {
-    flex: 1,
-  },
-  revenueCardTitle: {
-    fontFamily: Fonts.brand,
-    fontSize: FontSize.xs,
-    color: Colors.primaryLight,
-  },
-  revenueCardAmount: {
-    fontFamily: Fonts.brandBold,
-    fontSize: FontSize.xl,
-    color: Colors.white,
-    marginTop: 2,
-  },
-  revenueCardBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  revenueCardBadgeText: {
-    fontFamily: Fonts.brandBold,
-    fontSize: FontSize.xs,
-    color: Colors.white,
   },
 });

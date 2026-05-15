@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
+  StatusBar,
 } from "react-native";
 import { showAlert } from "@/store/useAlertStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,13 +21,14 @@ import {
   useUpdateRestaurant,
   useDeleteRestaurant,
 } from "@/hooks/useRestaurantPartnerRequest";
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { Fonts, FontSize } from "@/constants/typography";
 import { getPlaceholderImage } from "@/constants/images";
 import { Restaurant } from "@/types/restaurant";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
+import { useTheme } from "@/context/ThemeContext";
 
 // ─── Cuisine Options ─────────────────────────────────────────────────────────
 const CUISINE_OPTIONS = [
@@ -42,6 +44,9 @@ const CUISINE_OPTIONS = [
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function RestaurantProfile() {
+  const { Colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+
   const { data: restaurant, isPending, refetch } = useMyRestaurant();
   const { mutate: deleteRestaurant, isPending: isDeleting } =
     useDeleteRestaurant();
@@ -100,6 +105,7 @@ export default function RestaurantProfile() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -112,11 +118,9 @@ export default function RestaurantProfile() {
           />
         }
       >
-        {/* Banner */}
         <View style={styles.bannerWrap}>
           <Image source={{ uri: bannerUri }} style={styles.banner} />
           <View style={styles.bannerOverlay} />
-          {/* Logo */}
           {restaurant.logo && (
             <View style={styles.logoWrap}>
               <Image source={{ uri: restaurant.logo }} style={styles.logo} />
@@ -124,7 +128,6 @@ export default function RestaurantProfile() {
           )}
         </View>
 
-        {/* Name & Status */}
         <View style={styles.headerSection}>
           <Text style={styles.restaurantName}>{restaurant.name}</Text>
           <View style={styles.badgeRow}>
@@ -181,7 +184,6 @@ export default function RestaurantProfile() {
           <Text style={styles.description}>{restaurant.description}</Text>
         </View>
 
-        {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Ionicons name="star" size={18} color={Colors.secondary} />
@@ -212,7 +214,6 @@ export default function RestaurantProfile() {
           </View>
         </View>
 
-        {/* Info Cards */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>CUISINES</Text>
           <View style={styles.chipContainer}>
@@ -268,7 +269,6 @@ export default function RestaurantProfile() {
           )}
         </View>
 
-        {/* Action Buttons */}
         <TouchableOpacity
           style={styles.updateBtn}
           onPress={() => setEditModalVisible(true)}
@@ -301,11 +301,12 @@ export default function RestaurantProfile() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Edit Modal */}
       <EditRestaurantModal
         visible={editModalVisible}
         restaurant={restaurant}
         onClose={() => setEditModalVisible(false)}
+        Colors={Colors}
+        isDark={isDark}
       />
     </View>
   );
@@ -316,11 +317,16 @@ function EditRestaurantModal({
   visible,
   restaurant,
   onClose,
+  Colors,
+  isDark,
 }: {
   visible: boolean;
   restaurant: Restaurant;
   onClose: () => void;
+  Colors: ThemeType;
+  isDark: boolean;
 }) {
+  const modalStyles = useMemo(() => createModalStyles(Colors, isDark), [Colors, isDark]);
   const { mutate: updateRestaurant, isPending } = useUpdateRestaurant();
 
   const [name, setName] = useState(restaurant.name);
@@ -349,9 +355,8 @@ function EditRestaurantModal({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
 
-        // ─── Validate image before uploading ─────────────────────────────
         try {
-          await validateImage(imageUri, 5); // 5MB max
+          await validateImage(imageUri, 5); 
         } catch (validationError) {
           showAlert(
             "Invalid Image",
@@ -362,13 +367,11 @@ function EditRestaurantModal({
           return;
         }
 
-        // ─── Start cloudinary upload ────────────────────────────────
         setCurrentUploadingItem(itemName);
         setIsCloudinaryUploading(true);
         setUploadProgress(0);
 
         try {
-          // ─── Simulate progress (0% → 50%) ──────────────────────────
           const progressInterval = setInterval(() => {
             setUploadProgress((prev) => {
               if (prev >= 50) {
@@ -379,16 +382,13 @@ function EditRestaurantModal({
             });
           }, 200);
 
-          // ─── Upload to Cloudinary ───────────────────────────────
           const response = await uploadImageToCloudinary(imageUri, "restaurant_uploads");
 
           clearInterval(progressInterval);
           setUploadProgress(100);
 
-          // ─── Store the secure URL ──────────────────────────────
           setImageUrl(response.secure_url);
 
-          // ─── Show success message ──────────────────────────────
           showAlert(
             "Success! ✅",
             `${itemName} uploaded to cloud successfully`,
@@ -502,7 +502,6 @@ function EditRestaurantModal({
         <View style={modalStyles.card}>
           <View style={modalStyles.handle} />
 
-          {/* Header */}
           <View style={modalStyles.header}>
             <View style={modalStyles.iconWrap}>
               <Ionicons
@@ -524,7 +523,6 @@ function EditRestaurantModal({
             style={modalStyles.scroll}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Name */}
             <Text style={modalStyles.inputLabel}>Restaurant Name</Text>
             <TextInput
               style={modalStyles.input}
@@ -534,7 +532,6 @@ function EditRestaurantModal({
               placeholderTextColor={Colors.muted}
             />
 
-            {/* Description */}
             <Text style={modalStyles.inputLabel}>Description</Text>
             <TextInput
               style={[modalStyles.input, { minHeight: 70, textAlignVertical: "top" }]}
@@ -545,7 +542,6 @@ function EditRestaurantModal({
               multiline
             />
 
-            {/* Address */}
             <Text style={modalStyles.inputLabel}>Address</Text>
             <TextInput
               style={modalStyles.input}
@@ -555,7 +551,6 @@ function EditRestaurantModal({
               placeholderTextColor={Colors.muted}
             />
 
-            {/* Cost for Two */}
             <Text style={modalStyles.inputLabel}>Cost for Two (₹)</Text>
             <TextInput
               style={modalStyles.input}
@@ -566,7 +561,6 @@ function EditRestaurantModal({
               keyboardType="number-pad"
             />
 
-            {/* Cuisines */}
             <Text style={modalStyles.inputLabel}>Cuisine Types</Text>
             <View style={modalStyles.chipContainer}>
               {CUISINE_OPTIONS.map((cuisine) => {
@@ -593,7 +587,6 @@ function EditRestaurantModal({
                 );
               })}
 
-              {/* Custom cuisines (not in preset list) */}
               {cuisines
                 .filter((c) => !CUISINE_OPTIONS.includes(c))
                 .map((c) => (
@@ -610,7 +603,6 @@ function EditRestaurantModal({
                   </TouchableOpacity>
                 ))}
 
-              {/* Add custom cuisine button */}
               <TouchableOpacity
                 style={modalStyles.addChipBtn}
                 onPress={() => setShowAddCuisine(true)}
@@ -621,7 +613,6 @@ function EditRestaurantModal({
               </TouchableOpacity>
             </View>
 
-            {/* Inline popup for custom cuisine */}
             {showAddCuisine && (
               <View style={modalStyles.addCuisinePopup}>
                 <TextInput
@@ -654,7 +645,6 @@ function EditRestaurantModal({
               </View>
             )}
 
-            {/* FSSAI */}
             <Text style={modalStyles.inputLabel}>FSSAI License</Text>
             <TextInput
               style={modalStyles.input}
@@ -665,7 +655,6 @@ function EditRestaurantModal({
               keyboardType="number-pad"
             />
 
-            {/* GST */}
             <Text style={modalStyles.inputLabel}>GST Number</Text>
             <TextInput
               style={modalStyles.input}
@@ -676,7 +665,6 @@ function EditRestaurantModal({
               autoCapitalize="characters"
             />
 
-            {/* Media Upload Section */}
             <Text style={modalStyles.inputLabel}>Restaurant Media</Text>
             <ImageUploadCard
               icon="image-outline"
@@ -685,10 +673,11 @@ function EditRestaurantModal({
               imageUrl={image}
               isLoading={isCloudinaryUploading}
               onPress={() => pickImage(setImage, "Restaurant Image")}
+              Colors={Colors}
+              styles={modalStyles}
             />
           </ScrollView>
 
-          {/* Cloudinary Upload Loading Overlay */}
           {isCloudinaryUploading && (
             <View style={modalStyles.uploadingOverlay}>
               <View style={modalStyles.uploadingModal}>
@@ -700,7 +689,6 @@ function EditRestaurantModal({
                   Uploading {currentUploadingItem}...
                 </Text>
 
-                {/* Progress Bar */}
                 <View style={modalStyles.progressBarContainer}>
                   <View style={modalStyles.progressBarBackground}>
                     <View
@@ -715,7 +703,6 @@ function EditRestaurantModal({
                   </Text>
                 </View>
 
-                {/* Loading Spinner */}
                 <View style={modalStyles.loadingSpinnerContainer}>
                   <ActivityIndicator size="large" color={Colors.primary} />
                 </View>
@@ -727,7 +714,6 @@ function EditRestaurantModal({
             </View>
           )}
 
-          {/* Actions */}
           <View style={modalStyles.actions}>
             <TouchableOpacity
               style={modalStyles.cancelBtn}
@@ -765,11 +751,77 @@ function EditRestaurantModal({
   );
 }
 
-// ─── Profile Styles ──────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+// ─── Reusable Image Upload Card ───────────────────────────────────────────────
+function ImageUploadCard({
+  icon,
+  title,
+  subtitle,
+  imageUrl,
+  isLoading,
+  onPress,
+  Colors,
+  styles,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  isLoading: boolean;
+  onPress: () => void;
+  Colors: ThemeType;
+  styles: any;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.uploadCard, imageUrl && styles.uploadCardUploaded]}
+      onPress={onPress}
+      disabled={isLoading}
+      activeOpacity={0.7}
+    >
+      {imageUrl ? (
+        <>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.uploadCardImage}
+          />
+          <View style={styles.uploadCardOverlay}>
+            <Ionicons
+              name="camera"
+              size={22}
+              color={Colors.white}
+            />
+            <Text style={{ color: Colors.white, fontFamily: Fonts.brandBold, fontSize: 10, marginTop: 4 }}>Change Image</Text>
+          </View>
+        </>
+      ) : (
+        <View style={styles.uploadCardContent}>
+          <View
+            style={[
+              styles.uploadCardIcon,
+              imageUrl && styles.uploadCardIconSuccess,
+            ]}
+          >
+            <Ionicons
+              name={imageUrl ? "checkmark" : icon}
+              size={24}
+              color={imageUrl ? Colors.white : Colors.primary}
+            />
+          </View>
+          <View style={styles.uploadCardText}>
+            <Text style={styles.uploadCardTitle}>{title}</Text>
+            <Text style={styles.uploadCardSubtitle}>{subtitle}</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 20,
@@ -778,7 +830,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   loadingText: {
     marginTop: 12,
@@ -793,7 +845,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.brandMedium,
   },
 
-  // Banner
   bannerWrap: {
     height: 200,
     position: "relative",
@@ -808,12 +859,9 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     position: "absolute",
-    bottom: -32,
+    bottom: -30,
     left: 20,
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 4,
     shadowColor: "#000",
     shadowOpacity: 0.1,
@@ -874,7 +922,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     marginHorizontal: 16,
     marginTop: 16,
@@ -909,7 +957,7 @@ const styles = StyleSheet.create({
 
   // Cards
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 16,
@@ -1003,77 +1051,15 @@ const styles = StyleSheet.create({
   },
 });
 
-// ─── Reusable Image Upload Card ───────────────────────────────────────────────
-function ImageUploadCard({
-  icon,
-  title,
-  subtitle,
-  imageUrl,
-  isLoading,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  imageUrl: string;
-  isLoading: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[modalStyles.uploadCard, imageUrl && modalStyles.uploadCardUploaded]}
-      onPress={onPress}
-      disabled={isLoading}
-      activeOpacity={0.7}
-    >
-      {imageUrl ? (
-        <>
-          <Image
-            source={{ uri: imageUrl }}
-            style={modalStyles.uploadCardImage}
-          />
-          <View style={modalStyles.uploadCardOverlay}>
-            <Ionicons
-              name="camera"
-              size={22}
-              color={Colors.white}
-            />
-            <Text style={{ color: Colors.white, fontFamily: Fonts.brandBold, fontSize: 10, marginTop: 4 }}>Change Image</Text>
-          </View>
-        </>
-      ) : (
-        <View style={modalStyles.uploadCardContent}>
-          <View
-            style={[
-              modalStyles.uploadCardIcon,
-              imageUrl && modalStyles.uploadCardIconSuccess,
-            ]}
-          >
-            <Ionicons
-              name={imageUrl ? "checkmark" : icon}
-              size={24}
-              color={imageUrl ? Colors.white : Colors.primary}
-            />
-          </View>
-          <View style={modalStyles.uploadCardText}>
-            <Text style={modalStyles.uploadCardTitle}>{title}</Text>
-            <Text style={modalStyles.uploadCardSubtitle}>{subtitle}</Text>
-          </View>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
 
-// ─── Modal Styles ────────────────────────────────────────────────────────────
-const modalStyles = StyleSheet.create({
+const createModalStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: isDark ? Colors.surface : Colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -1127,7 +1113,7 @@ const modalStyles = StyleSheet.create({
     marginTop: 12,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? Colors.background : Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1149,7 +1135,7 @@ const modalStyles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    backgroundColor: Colors.white,
+    backgroundColor: isDark ? Colors.background : Colors.white,
   },
   chipSelected: {
     backgroundColor: Colors.primary,
@@ -1187,7 +1173,7 @@ const modalStyles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     marginTop: 10,
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? Colors.background : Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.primary + "40",
@@ -1262,7 +1248,7 @@ const modalStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginTop: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? Colors.background : Colors.surface,
     borderStyle: "dashed",
     overflow: "hidden",
     minHeight: 110,
@@ -1332,7 +1318,7 @@ const modalStyles = StyleSheet.create({
     borderTopRightRadius: 24,
   },
   uploadingModal: {
-    backgroundColor: Colors.white,
+    backgroundColor: isDark ? Colors.surface : Colors.white,
     borderRadius: 24,
     paddingVertical: 32,
     paddingHorizontal: 24,

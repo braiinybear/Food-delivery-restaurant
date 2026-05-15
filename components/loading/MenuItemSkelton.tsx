@@ -1,10 +1,12 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 import Skeleton from "./Skeleton";
 
 export default function MenuItemSkeleton() {
+  const { Colors } = useTheme();
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1 }]}>
       <Skeleton style={styles.strip} />
       <Skeleton style={styles.image} />
 
@@ -32,7 +34,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#fff",
   },
   strip: {
     width: 4,

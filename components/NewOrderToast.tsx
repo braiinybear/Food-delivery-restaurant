@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/colors';
+import { useTheme } from '@/context/ThemeContext';
 
 interface NewOrderToastProps {
   orderId: string;
@@ -49,6 +49,7 @@ export function NewOrderToast({
   queuePosition = 1,
   totalInQueue = 1,
 }: NewOrderToastProps) {
+  const { Colors, isDark } = useTheme();
   const [slideAnim] = useState(new Animated.Value(-150));
   const [visible, setVisible] = useState(true);
 
@@ -95,72 +96,72 @@ export function NewOrderToast({
     >
       {/* Queue Badge - Show when multiple orders */}
       {hasQueue && (
-        <View style={styles.queueBadge}>
-          <Text style={styles.queueText}>
+        <View style={[styles.queueBadge, { backgroundColor: isDark ? Colors.surface : '#FFF3E0', borderLeftColor: Colors.primary }]}>
+          <Text style={[styles.queueText, { color: Colors.primary }]}>
             +{totalInQueue - 1} more order{totalInQueue - 1 !== 1 ? 's' : ''} waiting
           </Text>
         </View>
       )}
 
-      <View style={styles.toast}>
+      <View style={[styles.toast, { backgroundColor: Colors.surface, borderLeftColor: Colors.primary, shadowColor: Colors.primary }]}>
         {/* Left: Premium icon badge */}
-        <View style={styles.iconBadge}>
-          <View style={styles.pulseCircle} />
-          <Ionicons name="checkmark-circle" size={40} color="#FFFFFF" />
+        <View style={[styles.iconBadge, { backgroundColor: Colors.primary }]}>
+          <View style={[styles.pulseCircle, { backgroundColor: Colors.primary }]} />
+          <Ionicons name="checkmark-circle" size={40} color={isDark ? Colors.background : "#FFFFFF"} />
         </View>
 
         {/* Middle: Order details */}
         <View style={styles.content}>
           <View style={styles.headerRow}>
-            <Text style={styles.title}>🎉 New Order!</Text>
+            <Text style={[styles.title, { color: Colors.text }]}>🎉 New Order!</Text>
             {hasQueue && (
-              <View style={styles.orderNumBadge}>
-                <Text style={styles.orderNumText}>#{queuePosition}</Text>
+              <View style={[styles.orderNumBadge, { backgroundColor: Colors.primary }]}>
+                <Text style={[styles.orderNumText, { color: isDark ? Colors.background : "#FFFFFF" }]}>#{queuePosition}</Text>
               </View>
             )}
           </View>
 
-          <Text style={styles.orderId}>Order #{orderId.slice(0, 8).toUpperCase()}</Text>
+          <Text style={[styles.orderId, { color: Colors.muted }]}>Order #{orderId.slice(0, 8).toUpperCase()}</Text>
 
-          <View style={styles.detailsRow}>
+          <View style={[styles.detailsRow, { borderTopColor: Colors.border }]}>
             <View style={styles.detailItem}>
-              <Ionicons name="restaurant" size={13} color="#666" />
-              <Text style={styles.detail}>{itemCount} item{itemCount !== 1 ? 's' : ''}</Text>
+              <Ionicons name="restaurant" size={13} color={Colors.muted} />
+              <Text style={[styles.detail, { color: Colors.muted }]}>{itemCount} item{itemCount !== 1 ? 's' : ''}</Text>
             </View>
-            <View style={styles.detailDivider} />
+            <View style={[styles.detailDivider, { backgroundColor: Colors.border }]} />
             <View style={styles.detailItem}>
-              <Ionicons name={paymentIcon} size={13} color="#666" />
-              <Text style={styles.detail}>{paymentLabel}</Text>
+              <Ionicons name={paymentIcon} size={13} color={Colors.muted} />
+              <Text style={[styles.detail, { color: Colors.muted }]}>{paymentLabel}</Text>
             </View>
           </View>
 
           <View style={styles.amountContainer}>
             <Text style={styles.amountLabel}>Total</Text>
-            <Text style={styles.amount}>₹{totalAmount}</Text>
+            <Text style={[styles.amount, { color: Colors.primary }]}>₹{totalAmount}</Text>
           </View>
         </View>
 
         {/* Right: Action buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[styles.acceptBtn, { opacity: isAccepting ? 0.6 : 1 }]}
+            style={[styles.acceptBtn, { backgroundColor: Colors.primary, opacity: isAccepting ? 0.6 : 1 }]}
             onPress={() => onAccept?.(orderId)}
             disabled={isAccepting}
           >
             {isAccepting ? (
-              <Ionicons name="hourglass" size={18} color="#FFFFFF" />
+              <Ionicons name="hourglass" size={18} color={isDark ? Colors.background : "#FFFFFF"} />
             ) : (
-              <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
+              <Ionicons name="checkmark-done" size={18} color={isDark ? Colors.background : "#FFFFFF"} />
             )}
-            <Text style={styles.acceptBtnText}>{isAccepting ? 'Accepting' : 'Accept'}</Text>
+            <Text style={[styles.acceptBtnText, { color: isDark ? Colors.background : "#FFFFFF" }]}>{isAccepting ? 'Accepting' : 'Accept'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.closeBtn}
+            style={[styles.closeBtn, { backgroundColor: Colors.background, borderColor: Colors.border }]}
             onPress={dismiss}
             disabled={isAccepting}
           >
-            <Ionicons name="close" size={18} color="#999" />
+            <Ionicons name="close" size={18} color={Colors.muted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -179,39 +180,32 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   queueBadge: {
-    backgroundColor: '#FFF3E0',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginBottom: 8,
     alignSelf: 'center',
     borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
   },
   queueText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.primary,
   },
   toast: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 12,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
   },
   iconBadge: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -222,7 +216,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primary,
     opacity: 0.3,
   },
   content: {
@@ -237,11 +230,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
     flex: 1,
   },
   orderNumBadge: {
-    backgroundColor: Colors.primary,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -249,11 +240,9 @@ const styles = StyleSheet.create({
   orderNumText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   orderId: {
     fontSize: 12,
-    color: '#666666',
     marginBottom: 6,
     fontWeight: '500',
   },
@@ -264,7 +253,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
   },
   detailItem: {
     flexDirection: 'row',
@@ -275,11 +263,9 @@ const styles = StyleSheet.create({
   detailDivider: {
     width: 1,
     height: 14,
-    backgroundColor: '#E0E0E0',
   },
   detail: {
     fontSize: 12,
-    color: '#666666',
     fontWeight: '500',
   },
   amountContainer: {
@@ -296,7 +282,6 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.primary,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -308,7 +293,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
@@ -318,16 +302,13 @@ const styles = StyleSheet.create({
   acceptBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
 });

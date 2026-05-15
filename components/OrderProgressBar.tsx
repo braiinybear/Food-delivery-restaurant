@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/colors';
+import { useTheme } from '@/context/ThemeContext';
 import { Fonts } from '@/constants/typography';
 
 interface OrderProgressBarProps {
@@ -26,6 +26,7 @@ const ORDER_STATUSES = [
  * - Icons for each stage
  */
 export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarProps) {
+  const { Colors, isDark } = useTheme();
   const [progressAnim] = useState(new Animated.Value(0));
 
   const currentStageIndex = useMemo(() => {
@@ -68,7 +69,7 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
   return (
     <View style={styles.container}>
       {/* Progress Background Bar */}
-      <View style={[styles.progressBarBackground, { height: config.height / 8 }]}>
+      <View style={[styles.progressBarBackground, { height: config.height / 8, backgroundColor: isDark ? Colors.border : Colors.light }]}>
         <Animated.View
           style={[
             styles.progressBarFill,
@@ -110,7 +111,7 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
                 <Ionicons
                   name={stage.icon}
                   size={config.iconSize}
-                  color={isCurrent || isCompleted ? 'white' : Colors.muted}
+                  color={isCurrent || isCompleted ? (isDark && isCurrent ? Colors.background : 'white') : Colors.muted}
                 />
               </View>
               {size !== 'small' && (
@@ -134,7 +135,7 @@ export function OrderProgressBar({ status, size = 'medium' }: OrderProgressBarPr
       </View>
 
       {/* Current Status Text */}
-      <Text style={styles.statusText}>
+      <Text style={[styles.statusText, { color: Colors.muted }]}>
         Current Status: <Text style={[styles.statusBold, { color: Colors.primary }]}>{status.replace(/_/g, ' ')}</Text>
       </Text>
     </View>
@@ -146,7 +147,6 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   progressBarBackground: {
-    backgroundColor: '#f0f0f0',
     borderRadius: 6,
     overflow: 'hidden',
     marginBottom: 16,
@@ -176,7 +176,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontFamily: Fonts.brand,
-    color: '#666',
     textAlign: 'center',
     marginTop: 8,
   },

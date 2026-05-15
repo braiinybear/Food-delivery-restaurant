@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StatusBar,
@@ -11,10 +11,11 @@ import {
     View,
 } from "react-native";
 import { showAlert } from "@/store/useAlertStore";
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { secureStorage } from "@/store/usePartner";
+import { useTheme } from "@/context/ThemeContext";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -35,11 +36,14 @@ interface SettingGroup {
 }
 
 export default function SettingsScreen() {
+    const { Colors, isDark, toggleTheme, theme } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+
     const [notifOrders, setNotifOrders] = useState(true);
     const [notifMarketing, setNotifMarketing] = useState(false);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [autoAccept, setAutoAccept] = useState(false);
-    const [darkMode, setDarkMode] = useState(false);
+    const [isOnline, setIsOnline] = useState(true);
     const [signingOut, setSigningOut] = useState(false);
 
     const handleSignOut = () => {
@@ -70,10 +74,19 @@ export default function SettingsScreen() {
         );
     };
 
-    const SETTINGS: SettingGroup[] = [
+    const SETTINGS: SettingGroup[] = useMemo(() => [
         {
             title: "Restaurant",
             rows: [
+                {
+                    icon: isOnline ? "radio-button-on" : "radio-button-off",
+                    label: isOnline ? "Restaurant is Online" : "Restaurant is Offline",
+                    sublabel: isOnline ? "Accepting orders now" : "Not accepting orders",
+                    type: "toggle",
+                    iconBg: isOnline ? Colors.success + "22" : Colors.danger + "22",
+                    value: isOnline,
+                    onToggle: setIsOnline,
+                },
                 {
                     icon: "storefront-outline",
                     label: "Restaurant Profile",
@@ -145,13 +158,13 @@ export default function SettingsScreen() {
             title: "Appearance",
             rows: [
                 {
-                    icon: "moon-outline",
+                    icon: isDark ? "moon" : "moon-outline",
                     label: "Dark Mode",
-                    sublabel: "Currently disabled",
+                    sublabel: isDark ? "Enabled" : "Disabled",
                     type: "toggle",
-                    iconBg: Colors.light,
-                    value: darkMode,
-                    onToggle: setDarkMode,
+                    iconBg: isDark ? Colors.primary + "22" : Colors.background,
+                    value: isDark,
+                    onToggle: () => toggleTheme(),
                 },
                 {
                     icon: "color-palette-outline",
@@ -216,7 +229,7 @@ export default function SettingsScreen() {
                     label: "App Version",
                     sublabel: "v1.4.2 (latest)",
                     type: "nav",
-                    iconBg: Colors.light,
+                    iconBg: Colors.background,
                     onPress: () => {},
                 },
             ],
@@ -233,11 +246,11 @@ export default function SettingsScreen() {
                 },
             ],
         },
-    ];
+    ], [Colors, isDark, autoAccept, isOnline, notifOrders, soundEnabled, notifMarketing, signingOut, toggleTheme]);
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
 
             {/* Profile Card */}
             <View style={styles.profileCard}>
@@ -301,10 +314,10 @@ export default function SettingsScreen() {
                                             value={row.value}
                                             onValueChange={row.onToggle}
                                             trackColor={{
-                                                false: Colors.light,
+                                                false: isDark ? Colors.border : Colors.light,
                                                 true: Colors.primary + "88",
                                             }}
-                                            thumbColor={row.value ? Colors.primary : Colors.muted}
+                                            thumbColor={row.value ? Colors.primary : isDark ? Colors.muted : Colors.white}
                                         />
                                     ) : (
                                         <Ionicons
@@ -325,7 +338,7 @@ export default function SettingsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     header: {
         flexDirection: "row",
@@ -363,18 +376,23 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 16,
         gap: 14,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.primary + "33",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.3 : 0.05,
+        shadowRadius: 10,
+        elevation: 3,
     },
     profileAvatar: {
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: Colors.primaryLight,
+        backgroundColor: Colors.primary + "11",
         justifyContent: "center",
         alignItems: "center",
         borderWidth: 2,
-        borderColor: Colors.primary + "55",
+        borderColor: Colors.primary + "33",
     },
     profileInfo: { flex: 1 },
     profileName: {
@@ -403,10 +421,10 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 12,
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.background,
         justifyContent: "center",
         alignItems: "center",
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
     },
     content: { paddingHorizontal: 16, paddingBottom: 24 },
@@ -423,7 +441,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface,
         borderRadius: 18,
         overflow: "hidden",
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
     },
     row: {
@@ -432,7 +450,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 13,
         gap: 12,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.surface,
     },
     rowBorder: {
         borderBottomWidth: 1,

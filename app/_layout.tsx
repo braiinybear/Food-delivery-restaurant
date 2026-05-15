@@ -1,5 +1,6 @@
 import SplashScreenView from "@/components/SplashScreenView";
-import { Colors } from "@/constants/colors";
+import { useUser } from "@/hooks/useUser";
+import { Colors as StaticColors } from "@/constants/colors";
 import * as NavigationBar from "expo-navigation-bar";
 // Better-auth authentication.
 import { authClient } from "@/lib/auth-client";
@@ -22,7 +23,10 @@ import GlobalCustomAlert from "@/components/GlobalCustomAlert";
 import { NotificationProvider } from "@/context/NotificationContext";
 import * as Notifications from "expo-notifications";
 import { SocketProvider } from "@/context/SocketContext";
+import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { StatusBar } from "expo-status-bar";
 import { AppUser } from "@/types/user";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -49,7 +53,19 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <ThemedRoot />
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+function ThemedRoot() {
+  const { Colors, isDark } = useTheme();
   const { data: session, isPending } = authClient.useSession();
+  const { isLoading: isUserLoading } = useUser({ enabled: !!session });
   const [splashDone, setSplashDone] = useState<boolean>(false);
 
   // Font loading
@@ -70,12 +86,13 @@ export default function RootLayout() {
     }
   }, [isAppReady]);
 
-  // Make Android nav bar buttons dark so they're visible on light backgrounds
+  // Make Android nav bar buttons match theme
   useEffect(() => {
     if (Platform.OS === "android") {
-      NavigationBar.setButtonStyleAsync("dark");
+      NavigationBar.setButtonStyleAsync(isDark ? "light" : "dark");
+      NavigationBar.setBackgroundColorAsync(Colors.background);
     }
-  }, []);
+  }, [isDark, Colors.background]);
 
   // Show nothing until fonts are ready
   if (!isAppReady) return null;
@@ -84,23 +101,20 @@ export default function RootLayout() {
   const isLoggedOut = !isPending && !session;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NotificationProvider>
-        <SocketProvider user={session?.user as AppUser | undefined}>
-          <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-            {/* Animated in-app splash on first load */}
-            {!splashDone && (
-              <SplashScreenView onFinish={() => setSplashDone(true)} />
-            )}
-
-            {/* Transition overlay during auth state transitions */}
-            {splashDone && isPending && (
-              <View style={transitionStyles.overlay}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            )}
-
-            <Stack>
+    <NotificationProvider>
+      <SocketProvider user={session?.user as AppUser | undefined}>
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          <StatusBar style={isDark ? "light" : "dark"} />
+          {/* BLOCK UI while auth session restores, splash animation is running, or session is being verified */}
+          {(!splashDone || isPending || (session && isUserLoading)) ? (
+            <SplashScreenView onFinish={() => setSplashDone(true)} />
+          ) : (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: Colors.background },
+              }}
+            >
               {/* Only accessible when not logged in */}
               <Stack.Protected guard={isLoggedOut}>
                 <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
@@ -121,53 +135,84 @@ export default function RootLayout() {
                   options={{
                     headerShown: true,
                     headerTitle: "Become a Partner",
-                    headerTintColor: "#fff",
+                    headerTintColor: Colors.primary,
                     headerStyle: {
-                      backgroundColor: Colors.primary,
+                      backgroundColor: isDark ? Colors.background : Colors.secondary,
                     },
                     headerTitleAlign: "center",
                     headerTitleStyle: {
-                      color: "#fff",
+                      color: Colors.primary,
+                      fontFamily: 'Nunito_700Bold',
                     },
 
                     headerLeft: () => (
                       <TouchableOpacity
                         onPress={() => router.back()}
-                        style={{ marginLeft: 10 }}
+                        style={{ marginLeft: 15 }}
                       >
-                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                        <Ionicons name="arrow-back" size={24} color={Colors.primary} />
                       </TouchableOpacity>
                     ),
                   }}
                 />
-                <Stack.Screen name="anu" />
-                <Stack.Screen name="menucategory" options={{headerShown:false}} />
-                <Stack.Screen name="menuitem" options={{headerShown:false}} />
-                <Stack.Screen name="restaurantProfile"   options={{
-                    headerShown: true,
-                    headerTitle: "Restaurant Profile",
-                    headerTintColor: "#fff",
-                    headerStyle: {
-                      backgroundColor: Colors.primary,
-                    },
-                    headerTitleAlign: "center",
-                    headerTitleStyle: {
-                      color: "#fff",
-                    },
-                  }} />
+                <Stack.Screen name="menucategory" options={{ headerShown: false }} />
+                <Stack.Screen name="menuitem" options={{ headerShown: false }} />
+                <Stack.Screen name="restaurantProfile" options={{
+                  headerShown: true,
+                  headerTitle: "Restaurant Profile",
+                  headerTintColor: Colors.primary,
+                  headerStyle: {
+                    backgroundColor: isDark ? Colors.background : Colors.secondary,
+                  },
+                  headerTitleAlign: "center",
+                  headerTitleStyle: {
+                    color: Colors.primary,
+                    fontFamily: 'Nunito_700Bold',
+                  },
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => router.back()}
+                      style={{ marginLeft: 15 }}
+                    >
+                      <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ),
+                }} />
+
+                <Stack.Screen name="notifications" options={{
+                  headerShown: true,
+                  headerTitle: "Notifications",
+                  headerTintColor: Colors.primary,
+                  headerStyle: {
+                    backgroundColor: isDark ? Colors.background : Colors.secondary,
+                  },
+                  headerTitleAlign: "center",
+                  headerTitleStyle: {
+                    color: Colors.primary,
+                    fontFamily: 'Nunito_700Bold',
+                  },
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => router.back()}
+                      style={{ marginLeft: 15 }}
+                    >
+                      <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                  ),
+                }} />
               </Stack.Protected>
             </Stack>
-          </View>
-        </SocketProvider>
-      </NotificationProvider>
+          )}
+        </View>
+      </SocketProvider>
       <GlobalCustomAlert />
-    </QueryClientProvider>
+    </NotificationProvider>
   );
 }
+
 const transitionStyles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.background,
     zIndex: 999,
     alignItems: "center",
     justifyContent: "center",

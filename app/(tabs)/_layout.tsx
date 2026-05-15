@@ -4,13 +4,14 @@ import { router, Tabs } from "expo-router";
 import React, { useEffect } from "react";
 import { Platform, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "../../constants/colors";
 import { NewOrderToast } from "../../components/NewOrderToast";
 import { useNewOrderAlert } from "../../hooks/useNewOrderAlert";
 import { useAcceptOrder } from "../../hooks/useAcceptOrder";
 import { useSocketStore } from "../../store/useSocketStore";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function TabsLayout() {
+    const { Colors, isDark } = useTheme();
     const insets = useSafeAreaInsets();
     const [orderQueue, setOrderQueue] = React.useState<any[]>([]);
     const [acceptingOrderId, setAcceptingOrderId] = React.useState<string | null>(null);
@@ -94,33 +95,43 @@ export default function TabsLayout() {
         }
 
         void NavigationBar.setPositionAsync("relative");
-        void NavigationBar.setBackgroundColorAsync("#E5E7EB");
-        void NavigationBar.setBorderColorAsync("#D1D5DB");
-        void NavigationBar.setButtonStyleAsync("dark");
-    }, []);
+        void NavigationBar.setBackgroundColorAsync(Colors.background);
+        void NavigationBar.setBorderColorAsync(Colors.border);
+        void NavigationBar.setButtonStyleAsync(isDark ? "light" : "dark");
+    }, [isDark, Colors]);
 
     return (
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
             {/* ✅ ORDER QUEUE - Shows multiple orders intelligently */}
 
             <Tabs
             screenOptions={{
                 headerShown: false,
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
-                headerTitleStyle: { color: Colors.white },
-                tabBarActiveTintColor: Colors.white,
-                tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
+                headerStyle: { 
+                    backgroundColor: isDark ? Colors.background : Colors.secondary,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.primary + '20',
+                },
+                headerTintColor: Colors.primary,
+                headerTitleStyle: { 
+                    color: Colors.primary, 
+                    fontFamily: 'brand-bold',
+                    fontSize: 18,
+                },
+                headerTitleAlign: 'center',
+                tabBarActiveTintColor: Colors.primary,
+                tabBarInactiveTintColor: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)",
                 tabBarStyle: {
-                    backgroundColor: Colors.primary,
-                    borderTopWidth: 0,
+                    backgroundColor: Colors.background,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.border,
                     height: 58 + insets.bottom,
                     paddingBottom: insets.bottom,
                     paddingTop: 6,
                     elevation: 12,
-                    shadowColor: Colors.primary,
+                    shadowColor: isDark ? Colors.secondary : "#000",
                     shadowOffset: { width: 0, height: -4 },
-                    shadowOpacity: 0.3,
+                    shadowOpacity: 0.1,
                     shadowRadius: 12,
                 },
                 tabBarLabelStyle: {

@@ -1,9 +1,9 @@
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { Fonts, FontSize } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { showAlert } from "@/store/useAlertStore";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
     ActivityIndicator,
@@ -11,16 +11,20 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type Step = "phone" | "otp";
 
 export default function Login() {
+    const { Colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
 
     const [toggleEmailPhoneLogin, settoggleEmailPhoneLogin] = useState<boolean>(false);
     // Phone / OTP state
@@ -151,9 +155,10 @@ export default function Login() {
 
     return (
         <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: Colors.background }}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={Colors.background} />
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
@@ -195,7 +200,7 @@ export default function Login() {
                                 >
                                     {otpLoading ? (
                                         <>
-                                            <ActivityIndicator color="#fff" />
+                                            <ActivityIndicator color={isDark ? Colors.background : Colors.white} />
                                             <Text style={styles.primaryButtonText}>Sending OTP...</Text>
                                         </>
                                     ) : (
@@ -255,7 +260,7 @@ export default function Login() {
                                 >
                                     {verifyLoading ? (
                                         <>
-                                            <ActivityIndicator color="#fff" />
+                                            <ActivityIndicator color={isDark ? Colors.background : Colors.white} />
                                             <Text style={styles.primaryButtonText}>Verifying...</Text>
                                         </>
                                     ) : (
@@ -308,7 +313,7 @@ export default function Login() {
                         >
                             {emailLoading ? (
                                 <>
-                                    <ActivityIndicator color="#fff" />
+                                    <ActivityIndicator color={isDark ? Colors.background : Colors.white} />
                                     <Text style={styles.secondaryButtonText}>Logging in...</Text>
                                 </>
                             ) : (
@@ -358,7 +363,7 @@ export default function Login() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
     container: {
         flexGrow: 1,
         padding: 24,
@@ -367,8 +372,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     logo: {
-        width: 200,
-        height: 200,
+        width: 180,
+        height: 180,
         alignSelf: "center",
         marginBottom: 4,
     },
@@ -388,7 +393,7 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontFamily: Fonts.brandBold,
         fontSize: FontSize.sm,
-        color: Colors.textSecondary,
+        color: Colors.muted,
         marginBottom: 10,
         textTransform: "uppercase",
         letterSpacing: 0.8,
@@ -402,9 +407,9 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     countryCode: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 14,
         backgroundColor: Colors.surface,
     },
@@ -415,7 +420,7 @@ const styles = StyleSheet.create({
     },
     phoneInput: {
         flex: 1,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
         borderRadius: 16,
         padding: 14,
@@ -429,7 +434,7 @@ const styles = StyleSheet.create({
     otpHint: {
         fontFamily: Fonts.brand,
         fontSize: FontSize.sm,
-        color: Colors.textSecondary,
+        color: Colors.muted,
         marginBottom: 12,
     },
     changePhone: {
@@ -453,7 +458,7 @@ const styles = StyleSheet.create({
 
     // ── Inputs ───────────────────────────────────────────────
     input: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
         padding: 14,
         borderRadius: 16,
@@ -466,51 +471,42 @@ const styles = StyleSheet.create({
 
     // ── Buttons ──────────────────────────────────────────────
     primaryButton: {
-        backgroundColor: Colors.primary,
+        backgroundColor: isDark ? Colors.primary : Colors.secondary,
         height: 56,
         borderRadius: 16,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
-        shadowColor: Colors.primary,
+        shadowColor: isDark ? Colors.primary : Colors.secondary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
         shadowRadius: 8,
         elevation: 5,
     },
     primaryButtonText: {
-        color: Colors.white,
+        color: isDark ? Colors.background : Colors.white,
         fontSize: FontSize.md,
         fontFamily: Fonts.brandBold,
     },
     secondaryButton: {
-        backgroundColor: Colors.primary,
+        backgroundColor: isDark ? Colors.primary : Colors.secondary,
         height: 56,
         borderRadius: 16,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
-        shadowColor: Colors.primary,
+        shadowColor: isDark ? Colors.primary : Colors.secondary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 5,
     },
     secondaryButtonText: {
-        color: Colors.white,
+        color: isDark ? Colors.background : Colors.white,
         fontSize: FontSize.md,
         fontFamily: Fonts.brandBold,
-    },
-    emailButton: {
-        backgroundColor: Colors.text,
-        padding: 5,
-        borderRadius: 12,
-        flexDirection: "row" as const,
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-        gap: 8,
     },
     buttonDisabled: {
         opacity: 0.6,
@@ -542,16 +538,15 @@ const styles = StyleSheet.create({
         borderColor: Colors.border,
         height: 52,
         borderRadius: 16,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? Colors.surface : Colors.white,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
+        shadowOpacity: isDark ? 0.2 : 0.06,
         shadowRadius: 6,
         elevation: 3,
         marginBottom: 8,
     },
-    googleIcon: { width: 35, height: 35 },
-    emailIcon: { width: 17, height: 17 },
+    googleIcon: { width: 32, height: 32 },
     googleButtonText: {
         color: Colors.text,
         fontSize: FontSize.md,
@@ -585,11 +580,11 @@ const styles = StyleSheet.create({
         textDecorationLine: "underline",
     },
     referralCodeInput: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
         padding: 15,
         borderRadius: 12,
-        backgroundColor: Colors.background,
+        backgroundColor: Colors.surface,
         fontSize: FontSize.md,
         fontFamily: Fonts.brandBold,
         color: Colors.text,

@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import {
     useDeleteMenuItem,
@@ -10,7 +10,7 @@ import { useMyRestaurantApplication } from "@/hooks/useRestaurantPartnerRequest"
 import { UpdateMenuItemRequest } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Image,
@@ -25,31 +25,20 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 import { showAlert } from "@/store/useAlertStore";
+import { useTheme } from "@/context/ThemeContext";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const ITEM_TYPES = ["VEG", "NON_VEG", "VEGAN"] as const;
 const SPICE_LEVELS = ["Low", "Medium", "High"] as const;
 
-const TYPE_CONFIG: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap; label: string }> = {
-    VEG: { color: "#2ECC71", icon: "leaf-outline", label: "Veg" },
-    NON_VEG: { color: "#E74C3C", icon: "nutrition-outline", label: "Non-Veg" },
-    EGG: { color: "#F39C12", icon: "ellipse-outline", label: "Egg" },
-    VEGAN: { color: "#27AE60", icon: "flower-outline", label: "Vegan" },
-};
-
-const SPICE_CONFIG: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap }> = {
-    Low: { color: "#2ECC71", icon: "thermometer-outline" },
-    Medium: { color: "#F39C12", icon: "thermometer-outline" },
-    High: { color: "#E74C3C", icon: "flame-outline" },
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function SectionCard({ children, title }: { children: React.ReactNode; title?: string }) {
+function SectionCard({ children, title, styles }: { children: React.ReactNode; title?: string; styles: any }) {
     return (
         <View style={styles.sectionCard}>
             {title && <Text style={styles.sectionCardTitle}>{title}</Text>}
@@ -58,7 +47,7 @@ function SectionCard({ children, title }: { children: React.ReactNode; title?: s
     );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children, styles }: { label: string; children: React.ReactNode; styles: any }) {
     return (
         <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>{label}</Text>
@@ -72,11 +61,15 @@ function OptionPill<T extends string>({
     selected,
     colorMap,
     onSelect,
+    Colors,
+    styles,
 }: {
     options: readonly T[];
     selected: T;
     colorMap: Record<string, { color: string }>;
     onSelect: (val: T) => void;
+    Colors: ThemeType;
+    styles: any;
 }) {
     return (
         <View style={styles.pillGroup}>
@@ -111,6 +104,23 @@ function OptionPill<T extends string>({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function MenuItemDetailScreen() {
+    const { Colors, isDark } = useTheme();
+    const insets = useSafeAreaInsets();
+    const styles = useMemo(() => createStyles(Colors, isDark, insets), [Colors, isDark, insets]);
+
+    const TYPE_CONFIG: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap; label: string }> = useMemo(() => ({
+        VEG: { color: "#2ECC71", icon: "leaf-outline", label: "Veg" },
+        NON_VEG: { color: "#E74C3C", icon: "nutrition-outline", label: "Non-Veg" },
+        EGG: { color: "#F39C12", icon: "ellipse-outline", label: "Egg" },
+        VEGAN: { color: "#27AE60", icon: "flower-outline", label: "Vegan" },
+    }), []);
+
+    const SPICE_CONFIG: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap }> = useMemo(() => ({
+        Low: { color: "#2ECC71", icon: "thermometer-outline" },
+        Medium: { color: "#F39C12", icon: "thermometer-outline" },
+        High: { color: "#E74C3C", icon: "flame-outline" },
+    }), []);
+
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const { data: application } = useMyRestaurantApplication();
@@ -121,7 +131,6 @@ export default function MenuItemDetailScreen() {
     const { mutate: updateItem, isPending: updating } = useUpdateMenuItem();
     const { mutate: deleteItem, isPending: deleting } = useDeleteMenuItem();
 
-    // ── Editable form state ──
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [price, setPrice] = useState("");
@@ -136,7 +145,6 @@ export default function MenuItemDetailScreen() {
     const [isCloudinaryUploading, setIsCloudinaryUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
 
-    // Populate from API data
     useEffect(() => {
         if (item) {
             setName(item.name ?? "");
@@ -168,26 +176,17 @@ export default function MenuItemDetailScreen() {
 
             if (!result.canceled && result.assets[0]) {
                 const imageUri = result.assets[0].uri;
-
-                // ─── Validate image before uploading ─────────────────────────────
                 try {
-                    await validateImage(imageUri, 5); // 5MB max
+                    await validateImage(imageUri, 5);
                 } catch (validationError) {
-                    showAlert(
-                        "Invalid Image",
-                        validationError instanceof Error
-                            ? validationError.message
-                            : "Please select a valid image",
-                    );
+                    showAlert("Invalid Image", validationError instanceof Error ? validationError.message : "Please select a valid image");
                     return;
                 }
 
-                // ─── Start cloudinary upload ────────────────────────────────
                 setIsCloudinaryUploading(true);
                 setUploadProgress(0);
 
                 try {
-                    // ─── Simulate progress (0% → 50%) ──────────────────────────
                     const progressInterval = setInterval(() => {
                         setUploadProgress((prev) => {
                             const next = prev + Math.random() * 40;
@@ -195,60 +194,35 @@ export default function MenuItemDetailScreen() {
                         });
                     }, 200);
 
-                    // ─── Upload to Cloudinary ───────────────────────────────
                     const response = await uploadImageToCloudinary(imageUri, "menu_items");
 
                     clearInterval(progressInterval);
                     setUploadProgress(100);
 
-                    // ─── Validate response and store the secure URL ─────────────────────────────
-                    if (!response.secure_url) {
-                        throw new Error("No image URL returned from Cloudinary");
-                    }
+                    if (!response.secure_url) throw new Error("No image URL returned from Cloudinary");
 
                     setImage(response.secure_url);
                     setIsDirty(true);
                     setIsCloudinaryUploading(false);
                     setUploadProgress(0);
 
-                    // ─── Show success message ──────────────────────────────
-                    showAlert(
-                        "Success! ✅",
-                        "Menu item image uploaded successfully",
-                        [{ text: "OK" }],
-                    );
+                    showAlert("Success! ✅", "Menu item image uploaded successfully", [{ text: "OK" }]);
                 } catch (uploadError) {
-                    showAlert(
-                        "Upload Failed ❌",
-                        uploadError instanceof Error
-                            ? uploadError.message
-                            : "Failed to upload image",
-                        [{ text: "Try Again" }],
-                    );
+                    showAlert("Upload Failed ❌", uploadError instanceof Error ? uploadError.message : "Failed to upload image", [{ text: "Try Again" }]);
                 } finally {
                     setIsCloudinaryUploading(false);
                     setUploadProgress(0);
                 }
             }
         } catch (error) {
-            showAlert(
-                "Error",
-                error instanceof Error ? error.message : "An error occurred",
-                [{ text: "OK" }],
-            );
+            showAlert("Error", error instanceof Error ? error.message : "An error occurred", [{ text: "OK" }]);
         }
     };
 
     const handleSave = () => {
-        if (!name.trim()) {
-            showAlert("Validation", "Item name cannot be empty.");
-            return;
-        }
+        if (!name.trim()) { showAlert("Validation", "Item name cannot be empty."); return; }
         const parsedPrice = parseFloat(price);
-        if (isNaN(parsedPrice) || parsedPrice <= 0) {
-            showAlert("Validation", "Please enter a valid price.");
-            return;
-        }
+        if (isNaN(parsedPrice) || parsedPrice <= 0) { showAlert("Validation", "Please enter a valid price."); return; }
 
         const body: UpdateMenuItemRequest = {
             name: name.trim(),
@@ -262,53 +236,27 @@ export default function MenuItemDetailScreen() {
             image: image || undefined,
         };
 
-        updateItem(
-            { id: id ?? "", body },
-            {
-                onSuccess: () => {
-                    setIsDirty(false);
-                    showAlert("Success", "Menu item updated successfully.");
-                },
-                onError: () => showAlert("Error", "Failed to update menu item. Try again."),
-            }
-        );
+        updateItem({ id: id ?? "", body }, {
+            onSuccess: () => { setIsDirty(false); showAlert("Success", "Menu item updated successfully."); },
+            onError: () => showAlert("Error", "Failed to update menu item. Try again."),
+        });
     };
 
     const handleToggleAvailability = () => {
         const newVal = !isAvailable;
         setIsAvailable(newVal);
-        updateItem(
-            { id: id ?? "", body: { isAvailable: newVal } as any },
-            {
-                onError: () => {
-                    setIsAvailable(!newVal); // revert on failure
-                    showAlert("Error", "Couldn't update availability.");
-                },
-            }
-        );
+        updateItem({ id: id ?? "", body: { isAvailable: newVal } as any }, {
+            onError: () => { setIsAvailable(!newVal); showAlert("Error", "Couldn't update availability."); },
+        });
     };
 
     const handleDelete = () => {
-        showAlert(
-            "Delete Item",
-            `Are you sure you want to delete "${item?.name}"? This action cannot be undone.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => {
-                        deleteItem(id ?? "", {
-                            onSuccess: () => router.back(),
-                            onError: () => showAlert("Error", "Failed to delete item. Try again."),
-                        });
-                    },
-                },
-            ]
-        );
+        showAlert("Delete Item", `Are you sure you want to delete "${item?.name}"? This action cannot be undone.`, [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => deleteItem(id ?? "", { onSuccess: () => router.back(), onError: () => showAlert("Error", "Failed to delete item. Try again.") }) },
+        ]);
     };
 
-    // ── Loading / Error states ──
     if (isLoading) {
         return (
             <View style={styles.centered}>
@@ -334,118 +282,62 @@ export default function MenuItemDetailScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
 
-            {/* ── Header ── */}
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backCircle} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={20} color={Colors.white} />
+                    <Ionicons name="arrow-back" size={20} color={isDark ? Colors.text : Colors.white} />
                 </TouchableOpacity>
 
                 <View style={styles.headerCenter}>
-                    <Text style={styles.headerTitle} numberOfLines={1}>
-                        {item.name}
-                    </Text>
+                    <Text style={styles.headerTitle} numberOfLines={1}>{item.name}</Text>
                     <View style={styles.headerBadgeRow}>
                         <View style={[styles.typeBadge, { borderColor: typeConfig.color + "AA" }]}>
                             <Ionicons name={typeConfig.icon} size={10} color={typeConfig.color} />
-                            <Text style={[styles.typeBadgeText, { color: typeConfig.color }]}>
-                                {typeConfig.label}
-                            </Text>
+                            <Text style={[styles.typeBadgeText, { color: typeConfig.color }]}>{typeConfig.label}</Text>
                         </View>
-                        <View
-                            style={[
-                                styles.availBadge,
-                                {
-                                    backgroundColor: isAvailable
-                                        ? Colors.success + "33"
-                                        : Colors.danger + "33",
-                                },
-                            ]}
-                        >
-                            <Text
-                                style={[
-                                    styles.availBadgeText,
-                                    { color: isAvailable ? Colors.success : Colors.danger },
-                                ]}
-                            >
-                                {isAvailable ? "Available" : "Unavailable"}
-                            </Text>
+                        <View style={[styles.availBadge, { backgroundColor: isAvailable ? Colors.success + "33" : Colors.danger + "33" }]}>
+                            <Text style={[styles.availBadgeText, { color: isAvailable ? Colors.success : Colors.danger }]}>{isAvailable ? "Available" : "Unavailable"}</Text>
                         </View>
                     </View>
                 </View>
 
-                <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={handleDelete}
-                    disabled={deleting}
-                >
-                    {deleting ? (
-                        <ActivityIndicator size="small" color={Colors.white} />
-                    ) : (
-                        <Ionicons name="trash-outline" size={18} color={Colors.white} />
-                    )}
+                <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={deleting}>
+                    {deleting ? <ActivityIndicator size="small" color={Colors.danger} /> : <Ionicons name="trash-outline" size={18} color={Colors.danger} />}
                 </TouchableOpacity>
             </View>
 
-            {/* ── Price hero ── */}
             <View style={styles.priceHero}>
                 <Text style={styles.priceHeroLabel}>Current Price</Text>
                 <Text style={styles.priceHeroValue}>₹{item.price}</Text>
                 <View style={styles.priceHeroMeta}>
                     <View style={styles.metaTag}>
                         <Ionicons name="time-outline" size={13} color={Colors.muted} />
-                        <Text style={styles.metaTagText}>{item.prepTime} min prep</Text>
+                        <Text style={styles.metaTagText}>{item.prepTime} min</Text>
                     </View>
                     {item.isBestseller && (
                         <View style={[styles.metaTag, styles.metaTagBestseller]}>
                             <Ionicons name="flame" size={13} color={Colors.secondary} />
-                            <Text style={[styles.metaTagText, { color: Colors.secondary }]}>
-                                Bestseller
-                            </Text>
+                            <Text style={[styles.metaTagText, { color: Colors.secondary }]}>Bestseller</Text>
                         </View>
                     )}
                 </View>
             </View>
 
-            {/* ── Form ── */}
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-            >
-                {/* Cloudinary Upload Loading Overlay */}
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
                 {isCloudinaryUploading && (
                     <View style={styles.uploadingOverlay}>
                         <View style={styles.uploadingModal}>
                             <View style={styles.uploadingIcon}>
                                 <Ionicons name="cloud-upload-outline" size={48} color={Colors.primary} />
                             </View>
-                            <Text style={styles.uploadingTitle}>Uploading to Cloud</Text>
-                            <Text style={styles.uploadingSubtitle}>
-                                Updating menu item image...
-                            </Text>
-
+                            <Text style={styles.uploadingTitle}>Uploading...</Text>
                             <View style={styles.progressBarContainer}>
                                 <View style={styles.progressBarBackground}>
-                                    <View
-                                        style={[
-                                            styles.progressBarFill,
-                                            { width: `${uploadProgress}%` },
-                                        ]}
-                                    />
+                                    <View style={[styles.progressBarFill, { width: `${uploadProgress}%` }]} />
                                 </View>
-                                <Text style={styles.progressPercentage}>
-                                    {Math.round(uploadProgress)}%
-                                </Text>
                             </View>
-
-                            <View style={styles.loadingSpinnerContainer}>
-                                <ActivityIndicator size="large" color={Colors.primary} />
-                            </View>
-
-                            <Text style={styles.uploadingHint}>
-                                This typically takes 5-15 seconds
-                            </Text>
+                            <ActivityIndicator size="large" color={Colors.primary} />
                         </View>
                     </View>
                 )}
@@ -456,285 +348,102 @@ export default function MenuItemDetailScreen() {
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Availability Toggle */}
-                    <SectionCard>
+                    <SectionCard styles={styles}>
                         <View style={styles.toggleRow}>
                             <View style={styles.toggleLeft}>
-                                <View
-                                    style={[
-                                        styles.toggleIconWrap,
-                                        {
-                                            backgroundColor: isAvailable
-                                                ? Colors.success + "18"
-                                                : Colors.danger + "18",
-                                        },
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name={isAvailable ? "checkmark-circle" : "close-circle"}
-                                        size={22}
-                                        color={isAvailable ? Colors.success : Colors.danger}
-                                    />
+                                <View style={[styles.toggleIconWrap, { backgroundColor: isAvailable ? Colors.success + "18" : Colors.danger + "18" }]}>
+                                    <Ionicons name={isAvailable ? "checkmark-circle" : "close-circle"} size={22} color={isAvailable ? Colors.success : Colors.danger} />
                                 </View>
                                 <View>
                                     <Text style={styles.toggleTitle}>Item Availability</Text>
-                                    <Text style={styles.toggleSub}>
-                                        {isAvailable
-                                            ? "Visible & orderable by customers"
-                                            : "Hidden from customer menu"}
-                                    </Text>
+                                    <Text style={styles.toggleSub}>{isAvailable ? "Visible to customers" : "Hidden"}</Text>
                                 </View>
                             </View>
                             <Switch
                                 value={isAvailable}
                                 onValueChange={handleToggleAvailability}
-                                trackColor={{
-                                    false: Colors.light,
-                                    true: Colors.success + "55",
-                                }}
+                                trackColor={{ false: isDark ? "#333" : "#F0F0F0", true: Colors.success + "55" }}
                                 thumbColor={isAvailable ? Colors.success : Colors.muted}
                             />
                         </View>
                     </SectionCard>
 
-                    {/* Image Upload Section */}
-                    <SectionCard title="ITEM IMAGE">
-                        <TouchableOpacity 
-                            style={styles.uploadCard}
-                            onPress={pickImage}
-                            disabled={isCloudinaryUploading}
-                            activeOpacity={0.8}
-                        >
+                    <SectionCard title="ITEM IMAGE" styles={styles}>
+                        <TouchableOpacity style={styles.uploadCard} onPress={pickImage} disabled={isCloudinaryUploading}>
                             {image ? (
                                 <>
-                                    <Image
-                                        source={{ uri: image }}
-                                        style={styles.uploadCardImage}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.uploadCardOverlay}>
-                                        <View style={styles.uploadCardContent}>
-                                            <View style={styles.uploadCardIcon}>
-                                                <Ionicons name="cloud-upload-outline" size={28} color={Colors.primary} />
-                                            </View>
-                                            <View style={styles.uploadCardText}>
-                                                <Text style={styles.uploadCardTitle}>Tap to Change</Text>
-                                                <Text style={styles.uploadCardSubtitle}>Select a different image</Text>
-                                            </View>
+                                    <Image source={{ uri: image }} style={styles.uploadCardImage} />
+                                    <View style={styles.cameraOverlay}>
+                                        <View style={styles.cameraIconCircle}>
+                                            <Ionicons name="camera" size={24} color="#FFF" />
                                         </View>
                                     </View>
                                 </>
                             ) : (
                                 <View style={styles.uploadCardContent}>
-                                    <View style={styles.uploadCardIcon}>
-                                        <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
-                                    </View>
-                                    <View style={styles.uploadCardText}>
-                                        <Text style={styles.uploadCardTitle}>Upload Image</Text>
-                                        <Text style={styles.uploadCardSubtitle}>Tap to select from device</Text>
-                                    </View>
+                                    <Ionicons name="cloud-upload-outline" size={32} color={Colors.primary} />
+                                    <Text style={styles.uploadCardTitle}>Upload</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
-                        {isCloudinaryUploading && (
-                            <View style={styles.uploadingProgressContainer}>
-                                <View style={styles.uploadingProgressBackground}>
-                                    <View
-                                        style={[
-                                            styles.uploadingProgressFill,
-                                            { width: `${uploadProgress}%` },
-                                        ]}
-                                    />
-                                </View>
-                                <Text style={styles.uploadingProgressText}>
-                                    {Math.round(uploadProgress)}%
-                                </Text>
-                            </View>
-                        )}
                     </SectionCard>
 
-                    {/* Basic Info */}
-                    <SectionCard title="BASIC INFO">
-                        <FieldRow label="Item Name">
-                            <TextInput
-                                style={styles.fieldInput}
-                                value={name}
-                                onChangeText={markDirty(setName)}
-                                placeholder="Enter item name"
-                                placeholderTextColor={Colors.muted}
-                            />
+                    <SectionCard title="BASIC INFO" styles={styles}>
+                        <FieldRow label="Item Name" styles={styles}>
+                            <TextInput style={styles.fieldInput} value={name} onChangeText={markDirty(setName)} placeholder="Enter item name" placeholderTextColor={Colors.muted} />
                         </FieldRow>
                         <View style={styles.fieldDivider} />
-                        <FieldRow label="Description">
-                            <TextInput
-                                style={[styles.fieldInput, styles.fieldInputMulti]}
-                                value={description}
-                                onChangeText={markDirty(setDescription)}
-                                placeholder="Item description…"
-                                placeholderTextColor={Colors.muted}
-                                multiline
-                                numberOfLines={3}
-                                textAlignVertical="top"
-                            />
+                        <FieldRow label="Description" styles={styles}>
+                            <TextInput style={[styles.fieldInput, styles.fieldInputMulti]} value={description} onChangeText={markDirty(setDescription)} placeholder="Item description…" placeholderTextColor={Colors.muted} multiline numberOfLines={3} />
                         </FieldRow>
                     </SectionCard>
 
-                    {/* Pricing & Prep Time */}
-                    <SectionCard title="PRICING & TIME">
+                    <SectionCard title="PRICING & TIME" styles={styles}>
                         <View style={styles.doubleRow}>
                             <View style={styles.doubleField}>
                                 <Text style={styles.fieldLabel}>Price (₹)</Text>
-                                <TextInput
-                                    style={styles.fieldInputInline}
-                                    value={price}
-                                    onChangeText={markDirty(setPrice)}
-                                    keyboardType="decimal-pad"
-                                    placeholder="0.00"
-                                    placeholderTextColor={Colors.muted}
-                                />
+                                <TextInput style={styles.fieldInputInline} value={price} onChangeText={markDirty(setPrice)} keyboardType="decimal-pad" />
                             </View>
                             <View style={styles.doubleFieldDivider} />
                             <View style={styles.doubleField}>
                                 <Text style={styles.fieldLabel}>Prep Time (min)</Text>
-                                <TextInput
-                                    style={styles.fieldInputInline}
-                                    value={prepTime}
-                                    onChangeText={markDirty(setPrepTime)}
-                                    keyboardType="number-pad"
-                                    placeholder="15"
-                                    placeholderTextColor={Colors.muted}
-                                />
+                                <TextInput style={styles.fieldInputInline} value={prepTime} onChangeText={markDirty(setPrepTime)} keyboardType="number-pad" />
                             </View>
                         </View>
                     </SectionCard>
 
-                    {/* Type */}
-                    <SectionCard title="ITEM TYPE">
-                        <OptionPill
-                            options={ITEM_TYPES}
-                            selected={type as any}
-                            colorMap={TYPE_CONFIG}
-                            onSelect={markDirty(setType)}
-                        />
+                    <SectionCard title="ITEM TYPE" styles={styles}>
+                        <OptionPill options={ITEM_TYPES} selected={type as any} colorMap={TYPE_CONFIG} onSelect={markDirty(setType)} Colors={Colors} styles={styles} />
                     </SectionCard>
 
-                    {/* Spice Level */}
-                    <SectionCard title="SPICE LEVEL">
-                        <OptionPill
-                            options={SPICE_LEVELS}
-                            selected={spiceLevel as any}
-                            colorMap={SPICE_CONFIG}
-                            onSelect={markDirty(setSpiceLevel)}
-                        />
+                    <SectionCard title="SPICE LEVEL" styles={styles}>
+                        <OptionPill options={SPICE_LEVELS} selected={spiceLevel as any} colorMap={SPICE_CONFIG} onSelect={markDirty(setSpiceLevel)} Colors={Colors} styles={styles} />
                     </SectionCard>
 
-                    {/* Category */}
                     {categories.length > 0 && (
-                        <SectionCard title="CATEGORY">
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ gap: 8 }}
-                            >
+                        <SectionCard title="CATEGORY" styles={styles}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                                 {categories.map((cat) => (
-                                    <TouchableOpacity
-                                        key={cat.id}
-                                        style={[
-                                            styles.catPill,
-                                            categoryId === cat.id && styles.catPillActive,
-                                        ]}
-                                        onPress={() => markDirty(setCategoryId)(cat.id)}
-                                        activeOpacity={0.75}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.catPillText,
-                                                categoryId === cat.id && styles.catPillTextActive,
-                                            ]}
-                                        >
-                                            {cat.name}
-                                        </Text>
+                                    <TouchableOpacity key={cat.id} style={[styles.catPill, categoryId === cat.id && styles.catPillActive]} onPress={() => markDirty(setCategoryId)(cat.id)}>
+                                        <Text style={[styles.catPillText, categoryId === cat.id && styles.catPillTextActive]}>{cat.name}</Text>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
                         </SectionCard>
                     )}
 
-                    {/* Bestseller Toggle */}
-                    <SectionCard>
+                    <SectionCard styles={styles}>
                         <View style={styles.toggleRow}>
                             <View style={styles.toggleLeft}>
-                                <View
-                                    style={[
-                                        styles.toggleIconWrap,
-                                        {
-                                            backgroundColor: isBestseller
-                                                ? Colors.secondary + "22"
-                                                : Colors.light,
-                                        },
-                                    ]}
-                                >
-                                    <Ionicons
-                                        name="flame"
-                                        size={22}
-                                        color={isBestseller ? Colors.secondary : Colors.muted}
-                                    />
-                                </View>
-                                <View>
-                                    <Text style={styles.toggleTitle}>Bestseller Tag</Text>
-                                    <Text style={styles.toggleSub}>
-                                        Highlight this item as a customer favourite
-                                    </Text>
-                                </View>
+                                <View style={[styles.toggleIconWrap, { backgroundColor: isBestseller ? Colors.secondary + "22" : Colors.background }]}><Ionicons name="flame" size={22} color={isBestseller ? Colors.secondary : Colors.muted} /></View>
+                                <View><Text style={styles.toggleTitle}>Bestseller Tag</Text></View>
                             </View>
-                            <Switch
-                                value={isBestseller}
-                                onValueChange={markDirty(setIsBestseller)}
-                                trackColor={{
-                                    false: Colors.light,
-                                    true: Colors.secondary + "55",
-                                }}
-                                thumbColor={isBestseller ? Colors.secondary : Colors.muted}
-                            />
+                            <Switch value={isBestseller} onValueChange={markDirty(setIsBestseller)} trackColor={{ false: isDark ? "#333" : "#F0F0F0", true: Colors.secondary + "55" }} thumbColor={isBestseller ? Colors.secondary : Colors.muted} />
                         </View>
                     </SectionCard>
 
-                    {/* Save button */}
-                    <TouchableOpacity
-                        style={[
-                            styles.saveBtn,
-                            !isDirty && styles.saveBtnDisabled,
-                            updating && { opacity: 0.7 },
-                        ]}
-                        onPress={handleSave}
-                        disabled={!isDirty || updating}
-                        activeOpacity={0.85}
-                    >
-                        {updating ? (
-                            <ActivityIndicator size="small" color={Colors.white} />
-                        ) : (
-                            <>
-                                <Ionicons name="save-outline" size={20} color={Colors.white} />
-                                <Text style={styles.saveBtnText}>Save Changes</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-
-                    {/* Delete button */}
-                    <TouchableOpacity
-                        style={styles.dangerBtn}
-                        onPress={handleDelete}
-                        disabled={deleting}
-                        activeOpacity={0.85}
-                    >
-                        {deleting ? (
-                            <ActivityIndicator size="small" color={Colors.danger} />
-                        ) : (
-                            <>
-                                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                                <Text style={styles.dangerBtnText}>Delete This Item</Text>
-                            </>
-                        )}
+                    <TouchableOpacity style={[styles.saveBtn, !isDirty && styles.saveBtnDisabled]} onPress={handleSave} disabled={!isDirty || updating}>
+                        <Text style={styles.saveBtnText}>{updating ? "Saving..." : "Save Changes"}</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -742,500 +451,236 @@ export default function MenuItemDetailScreen() {
     );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.background,
+const createStyles = (Colors: ThemeType, isDark: boolean, insets: any) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.background },
+    header: { 
+        backgroundColor: isDark ? Colors.background : Colors.secondary, 
+        paddingTop: Platform.OS === "ios" ? insets.top : Math.max(insets.top, 20),
+        paddingBottom: 18, 
+        paddingHorizontal: 16, 
+        flexDirection: "row", 
+        alignItems: "flex-end", 
+        gap: 12 
     },
-
-    // Header
-    header: {
-        backgroundColor: Colors.primary,
-        paddingTop: 52,
-        paddingBottom: 18,
-        paddingHorizontal: 16,
-        flexDirection: "row",
-        alignItems: "flex-end",
-        gap: 12,
-    },
-    backCircle: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: "rgba(255,255,255,0.18)",
-        justifyContent: "center",
-        alignItems: "center",
+    backCircle: { 
+        width: 38, 
+        height: 38, 
+        borderRadius: 19, 
+        backgroundColor: isDark ? Colors.background : "rgba(255,255,255,0.18)", 
+        justifyContent: "center", 
+        alignItems: "center" 
     },
     headerCenter: { flex: 1 },
-    headerTitle: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.xl,
-        color: Colors.white,
-        letterSpacing: 0.3,
+    headerTitle: { 
+        fontFamily: Fonts.brandBold, 
+        fontSize: FontSize.xl, 
+        color: isDark ? Colors.text : Colors.primary, 
+        letterSpacing: 0.3 
     },
-    headerBadgeRow: {
-        flexDirection: "row",
-        gap: 6,
-        marginTop: 4,
+    headerBadgeRow: { flexDirection: "row", gap: 6 },
+    typeBadge: { 
+        flexDirection: "row", 
+        alignItems: "center", 
+        gap: 4, 
+        borderWidth: 1, 
+        borderRadius: 6, 
+        paddingHorizontal: 7, 
+        paddingVertical: 2, 
+        backgroundColor: isDark ? Colors.background : "rgba(255,255,255,0.12)" 
     },
-    typeBadge: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        borderWidth: 1,
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
+    typeBadgeText: { fontFamily: Fonts.brandMedium, fontSize: 10 },
+    availBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+    availBadgeText: { fontFamily: Fonts.brandBold, fontSize: 10 },
+    deleteBtn: { 
+        width: 38, 
+        height: 38, 
+        borderRadius: 12, 
+        backgroundColor: isDark ? Colors.danger + "22" : "rgba(255,255,255,0.18)", 
+        justifyContent: "center", 
+        alignItems: "center" 
+    },
+    priceHero: { 
+        padding: 20, 
+        backgroundColor: isDark ? Colors.background : Colors.secondary, 
+        borderBottomLeftRadius: 30, 
+        borderBottomRightRadius: 30, 
+        alignItems: "center" 
+    },
+    priceHeroLabel: { 
+        fontFamily: Fonts.brand, 
+        fontSize: 12, 
+        color: "rgba(255,255,255,0.7)", 
+        marginBottom: 4 
+    },
+    priceHeroValue: { fontFamily: Fonts.brandBlack, fontSize: 36, color: isDark ? Colors.text : Colors.white },
+    priceHeroMeta: { flexDirection: "row", gap: 8, marginTop: 12 },
+    metaTag: { 
+        flexDirection: "row", 
+        alignItems: "center", 
+        gap: 4, 
+        paddingHorizontal: 10, 
+        paddingVertical: 5, 
+        borderRadius: 10, 
         backgroundColor: "rgba(255,255,255,0.12)",
     },
-    typeBadgeText: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: 10,
-    },
-    availBadge: {
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-    },
-    availBadgeText: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: 10,
-    },
-    deleteBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: Colors.danger + "CC",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-
-    // Price hero
-    priceHero: {
-        backgroundColor: Colors.surface,
-        paddingVertical: 20,
-        paddingHorizontal: 22,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 16,
-        flexWrap: "wrap",
-    },
-    priceHeroLabel: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: FontSize.xs,
-        color: Colors.muted,
-        letterSpacing: 1,
-        textTransform: "uppercase",
-    },
-    priceHeroValue: {
-        fontFamily: Fonts.brandBlack,
-        fontSize: FontSize.xxl,
-        color: Colors.primary,
-    },
-    priceHeroMeta: {
-        flexDirection: "row",
-        gap: 8,
-        flex: 1,
-        flexWrap: "wrap",
-    },
-    metaTag: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: Colors.light,
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    metaTagBestseller: {
-        backgroundColor: Colors.secondary + "22",
-    },
-    metaTagText: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.xs,
-        color: Colors.muted,
-    },
-
-    // Scroll
+    metaTagBestseller: { backgroundColor: Colors.secondary + "22" },
+    metaTagText: { fontFamily: Fonts.brandMedium, fontSize: 11, color: "rgba(255,255,255,0.8)" },
+    centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: Colors.background },
+    loadingText: { fontFamily: Fonts.brand, fontSize: FontSize.sm, color: Colors.muted, marginTop: 12 },
+    errorText: { fontFamily: Fonts.brand, fontSize: FontSize.sm, color: Colors.danger, marginTop: 12, marginBottom: 20 },
+    backBtn: { backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+    backBtnText: { fontFamily: Fonts.brandBold, fontSize: FontSize.sm, color: Colors.white },
     scroll: { flex: 1 },
-    scrollContent: { paddingTop: 16, paddingBottom: 60, gap: 12, paddingHorizontal: 16 },
-
-    // Section card
-    sectionCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
+    scrollContent: { padding: 20, paddingBottom: 100 },
+    sectionCard: { 
+        backgroundColor: Colors.surface, 
+        borderRadius: 20, 
+        padding: 20, 
+        marginBottom: 20,
         borderWidth: 1,
         borderColor: Colors.border,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
     },
-    sectionCardTitle: {
-        fontFamily: Fonts.brandBold,
-        fontSize: 10,
-        color: Colors.muted,
-        letterSpacing: 2,
-        marginBottom: 14,
+    sectionCardTitle: { 
+        fontFamily: Fonts.brandBold, 
+        fontSize: 12, 
+        color: Colors.muted, 
+        letterSpacing: 1, 
+        textTransform: "uppercase", 
+        marginBottom: 16 
     },
-
-    // Field row
-    fieldRow: {
-        gap: 6,
+    fieldRow: { marginBottom: 0 },
+    fieldLabel: { fontFamily: Fonts.brandBold, fontSize: 12, color: Colors.muted, marginBottom: 8 },
+    fieldInput: { 
+        fontFamily: Fonts.brand, 
+        fontSize: FontSize.md, 
+        color: Colors.text, 
+        backgroundColor: Colors.background, 
+        borderRadius: 12, 
+        padding: 12, 
+        borderWidth: 1, 
+        borderColor: Colors.border 
     },
-    fieldLabel: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: FontSize.xs,
-        color: Colors.textSecondary,
-        letterSpacing: 0.3,
+    fieldInputMulti: { height: 100, textAlignVertical: "top" },
+    fieldDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 16 },
+    doubleRow: { flexDirection: "row", gap: 16 },
+    doubleField: { flex: 1 },
+    doubleFieldDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: 8 },
+    fieldInputInline: { 
+        fontFamily: Fonts.brandBold, 
+        fontSize: FontSize.md, 
+        color: Colors.text, 
+        backgroundColor: Colors.background, 
+        borderRadius: 12, 
+        padding: 12, 
+        borderWidth: 1, 
+        borderColor: Colors.border 
     },
-    fieldInput: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.md,
-        color: Colors.text,
+    pillGroup: { flexDirection: "row", gap: 8 },
+    pill: { 
+        flex: 1, 
+        paddingVertical: 10, 
+        borderRadius: 12, 
+        borderWidth: 1, 
+        borderColor: Colors.border, 
+        alignItems: "center", 
+        backgroundColor: Colors.background 
+    },
+    pillText: { fontFamily: Fonts.brandBold, fontSize: 11, color: Colors.muted },
+    catPill: { 
+        paddingHorizontal: 16, 
+        paddingVertical: 8, 
+        borderRadius: 20, 
+        borderWidth: 1, 
+        borderColor: Colors.border, 
+        backgroundColor: Colors.background 
+    },
+    catPillActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    catPillText: { fontFamily: Fonts.brandBold, fontSize: 12, color: Colors.muted },
+    catPillTextActive: { color: Colors.white },
+    toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    toggleLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+    toggleIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+    toggleTitle: { fontFamily: Fonts.brandBold, fontSize: FontSize.md, color: Colors.text },
+    toggleSub: { fontFamily: Fonts.brand, fontSize: FontSize.xs, color: Colors.muted },
+    uploadCard: { 
+        width: "100%", 
+        height: 160, 
+        borderRadius: 20, 
+        backgroundColor: Colors.background, 
+        borderWidth: 1, 
+        borderColor: Colors.border, 
+        borderStyle: "dashed", 
+        justifyContent: "center", 
+        alignItems: "center", 
+        overflow: "hidden" 
+    },
+    uploadCardImage: { width: "100%", height: "100%" },
+    uploadCardContent: { alignItems: "center", gap: 8 },
+    uploadCardTitle: { fontFamily: Fonts.brandBold, fontSize: FontSize.md, color: Colors.primary },
+    cameraOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.15)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    cameraIconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
         borderWidth: 1,
-        borderColor: Colors.border,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 11,
-        backgroundColor: Colors.background,
+        borderColor: "rgba(255,255,255,0.3)",
     },
-    fieldInputMulti: {
-        minHeight: 80,
-        paddingTop: 11,
+    saveBtn: { 
+        backgroundColor: Colors.primary, 
+        padding: 18, 
+        borderRadius: 16, 
+        alignItems: "center", 
+        shadowColor: Colors.primary, 
+        shadowOffset: { width: 0, height: 6 }, 
+        shadowOpacity: 0.3, 
+        shadowRadius: 12, 
+        elevation: 8 
     },
-    fieldDivider: {
-        height: 1,
-        backgroundColor: Colors.border,
-        marginVertical: 12,
-    },
-
-    // Double row (price + prep time)
-    doubleRow: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    doubleField: {
-        flex: 1,
-        gap: 8,
-    },
-    doubleFieldDivider: {
-        width: 1,
-        backgroundColor: Colors.border,
-    },
-    fieldInputInline: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.lg,
-        color: Colors.text,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 11,
-        backgroundColor: Colors.background,
-    },
-
-    // Pill selector
-    pillGroup: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
-    },
-    pill: {
-        borderWidth: 1.5,
-        borderColor: Colors.border,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        backgroundColor: Colors.background,
-    },
-    pillText: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: FontSize.sm,
-        color: Colors.textSecondary,
-    },
-
-    // Category pill
-    catPill: {
-        borderWidth: 1.5,
-        borderColor: Colors.border,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        backgroundColor: Colors.background,
-    },
-    catPillActive: {
-        backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
-    },
-    catPillText: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: FontSize.sm,
-        color: Colors.textSecondary,
-    },
-    catPillTextActive: {
-        color: Colors.white,
-    },
-
-    // Toggle row
-    toggleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
-    toggleLeft: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        flex: 1,
-    },
-    toggleIconWrap: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    toggleTitle: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.md,
-        color: Colors.text,
-    },
-    toggleSub: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.xs,
-        color: Colors.muted,
-        marginTop: 2,
-        maxWidth: 200,
-    },
-
-    // Save button
-    saveBtn: {
-        backgroundColor: Colors.primary,
-        borderRadius: 16,
-        paddingVertical: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        marginTop: 4,
-    },
-    saveBtnDisabled: {
-        backgroundColor: Colors.muted,
-    },
-    saveBtnText: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.md,
-        color: Colors.white,
-    },
-
-    // Delete button
-    dangerBtn: {
-        borderWidth: 1.5,
-        borderColor: Colors.danger,
-        borderRadius: 16,
-        paddingVertical: 14,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-    },
-    dangerBtnText: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.md,
-        color: Colors.danger,
-    },
-
-    // States
-    centered: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 12,
-        backgroundColor: Colors.background,
-    },
-    loadingText: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.sm,
-        color: Colors.muted,
-    },
-    errorText: {
-        fontFamily: Fonts.brandMedium,
-        fontSize: FontSize.md,
-        color: Colors.danger,
-        textAlign: "center",
-    },
-    backBtn: {
-        marginTop: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 28,
-        borderRadius: 12,
-        backgroundColor: Colors.primary,
-    },
-    backBtnText: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.md,
-        color: Colors.white,
-    },
-
-    // Upload Card
-    uploadCard: {
-        borderWidth: 2,
-        borderColor: Colors.border,
-        borderStyle: "dashed",
-        borderRadius: 16,
-        padding: 0,
-        overflow: "hidden",
-        marginBottom: 12,
-        minHeight: 120,
-        maxHeight: 160,
-        backgroundColor: Colors.surface,
-    },
-    uploadCardImage: {
-        width: "100%",
-        height: "100%",
-    },
-    uploadCardOverlay: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    uploadCardContent: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 12,
-    },
-    uploadCardIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: Colors.primaryLight,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    uploadCardText: {
-        alignItems: "center",
-        gap: 4,
-    },
-    uploadCardTitle: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.md,
-        color: Colors.text,
-    },
-    uploadCardSubtitle: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.sm,
-        color: Colors.muted,
-    },
-
-    // Upload Progress (within form)
-    uploadingProgressContainer: {
-        marginTop: 12,
-    },
-    uploadingProgressBackground: {
-        width: "100%",
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: Colors.border,
-        overflow: "hidden",
-        marginBottom: 8,
-    },
-    uploadingProgressFill: {
-        height: "100%",
-        backgroundColor: Colors.primary,
-        borderRadius: 4,
-    },
-    uploadingProgressText: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.xs,
-        color: Colors.text,
-        textAlign: "center",
-    },
+    saveBtnDisabled: { backgroundColor: Colors.muted + "44", shadowOpacity: 0, elevation: 0 },
+    saveBtnText: { fontFamily: Fonts.brandBold, fontSize: FontSize.md, color: Colors.white },
 
     // Uploading Overlay
-    uploadingOverlay: {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 999,
+    uploadingOverlay: { 
+        ...StyleSheet.absoluteFillObject, 
+        backgroundColor: "rgba(0,0,0,0.7)", 
+        zIndex: 999, 
+        justifyContent: "center", 
+        alignItems: "center" 
     },
-    uploadingModal: {
-        backgroundColor: Colors.white,
-        borderRadius: 24,
-        padding: 32,
-        alignItems: "center",
+    uploadingModal: { 
+        backgroundColor: Colors.surface, 
+        borderRadius: 24, 
+        padding: 32, 
+        alignItems: "center", 
         width: "80%",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
         shadowRadius: 20,
-        elevation: 16,
+        elevation: 20,
     },
-    uploadingIcon: {
-        width: 64,
-        height: 64,
-        borderRadius: 20,
-        backgroundColor: Colors.primaryLight,
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 16,
+    uploadingIcon: { 
+        width: 64, 
+        height: 64, 
+        borderRadius: 20, 
+        backgroundColor: Colors.primary + "18", 
+        justifyContent: "center", 
+        alignItems: "center", 
+        marginBottom: 16 
     },
-    uploadingTitle: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.lg,
-        color: Colors.text,
-        marginBottom: 4,
-    },
-    uploadingSubtitle: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.sm,
-        color: Colors.muted,
-        marginBottom: 24,
-        textAlign: "center",
-    },
-    progressBarContainer: {
-        width: "100%",
-        marginBottom: 16,
-    },
-    progressBarBackground: {
-        width: "100%",
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: Colors.border,
-        overflow: "hidden",
-        marginBottom: 8,
-    },
-    progressBarFill: {
-        height: "100%",
-        backgroundColor: Colors.primary,
-        borderRadius: 4,
-    },
-    progressPercentage: {
-        fontFamily: Fonts.brandBold,
-        fontSize: FontSize.sm,
-        color: Colors.text,
-        textAlign: "center",
-    },
-    loadingSpinnerContainer: {
-        marginBottom: 16,
-    },
-    uploadingHint: {
-        fontFamily: Fonts.brand,
-        fontSize: FontSize.xs,
-        color: Colors.muted,
-        textAlign: "center",
-    },
+    uploadingTitle: { fontFamily: Fonts.brandBold, fontSize: FontSize.lg, color: Colors.text, marginBottom: 16 },
+    progressBarContainer: { width: "100%", height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: "hidden", marginBottom: 20 },
+    progressBarBackground: { flex: 1, backgroundColor: Colors.border },
+    progressBarFill: { height: "100%", backgroundColor: Colors.primary },
+    progressPercentage: { fontFamily: Fonts.brandBold, fontSize: FontSize.sm, color: Colors.text },
+    loadingSpinnerContainer: { marginBottom: 16 },
+    uploadingHint: { fontFamily: Fonts.brand, fontSize: FontSize.xs, color: Colors.muted },
 });

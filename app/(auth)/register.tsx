@@ -1,9 +1,9 @@
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { Fonts, FontSize } from "@/constants/typography";
 import { authClient } from "@/lib/auth-client";
 import { showAlert } from "@/store/useAlertStore";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
     ActivityIndicator,
@@ -11,14 +11,19 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function Register() {
+    const { Colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+
     const [isLoading, setIsLoading] = useState(false);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -74,9 +79,10 @@ export default function Register() {
 
     return (
         <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: Colors.background }}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={Colors.background} />
             <ScrollView
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
@@ -141,7 +147,7 @@ export default function Register() {
                     >
                         {isLoading ? (
                             <>
-                                <ActivityIndicator color="#fff" />
+                                <ActivityIndicator color={isDark ? Colors.background : Colors.white} />
                                 <Text style={styles.primaryButtonText}>Creating Account...</Text>
                             </>
                         ) : (
@@ -183,7 +189,7 @@ export default function Register() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
     container: {
         flexGrow: 1,
         padding: 24,
@@ -192,8 +198,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     logo: {
-        width: 200,
-        height: 200,
+        width: 180,
+        height: 180,
         alignSelf: "center",
         marginBottom: 4,
     },
@@ -206,7 +212,7 @@ const styles = StyleSheet.create({
     sectionLabel: {
         fontFamily: Fonts.brandBold,
         fontSize: FontSize.sm,
-        color: Colors.textSecondary,
+        color: Colors.muted,
         marginBottom: 10,
         textTransform: "uppercase",
         letterSpacing: 0.8,
@@ -214,29 +220,34 @@ const styles = StyleSheet.create({
 
     // ── Inputs ───────────────────────────────────────────────
     input: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
         padding: 14,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 14,
         fontSize: FontSize.md,
         fontFamily: Fonts.brand,
-        backgroundColor: Colors.background,
+        backgroundColor: Colors.surface,
         color: Colors.text,
     },
 
     // ── Buttons ──────────────────────────────────────────────
     primaryButton: {
-        backgroundColor: Colors.primary,
-        padding: 16,
-        borderRadius: 12,
+        backgroundColor: isDark ? Colors.primary : Colors.secondary,
+        height: 56,
+        borderRadius: 16,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
+        shadowColor: isDark ? Colors.primary : Colors.secondary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 5,
     },
     primaryButtonText: {
-        color: Colors.white,
+        color: isDark ? Colors.background : Colors.white,
         fontSize: FontSize.md,
         fontFamily: Fonts.brandBold,
     },
@@ -265,20 +276,20 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        borderWidth: 1,
+        gap: 10,
+        borderWidth: 1.5,
         borderColor: Colors.border,
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: Colors.background,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: isDark ? Colors.surface : Colors.white,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.2 : 0.06,
+        shadowRadius: 6,
+        elevation: 3,
         marginBottom: 8,
     },
-    googleIcon: { width: 35, height: 35 },
+    googleIcon: { width: 32, height: 32 },
     googleButtonText: {
         color: Colors.text,
         fontSize: FontSize.md,
@@ -301,13 +312,13 @@ const styles = StyleSheet.create({
         textDecorationLine: "underline",
     },
     referralCodeInput: {
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
         padding: 15,
         borderRadius: 12,
-        backgroundColor: Colors.background,
+        backgroundColor: Colors.surface,
         fontSize: FontSize.md,
-        fontFamily: Fonts.brand,
+        fontFamily: Fonts.brandMedium,
         color: Colors.text,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },

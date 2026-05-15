@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Dimensions,
@@ -11,9 +11,10 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import { useRestaurantStats, StatsPeriod } from "@/hooks/useRestaurantStats";
+import { useTheme } from "@/context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -28,18 +29,20 @@ const PAYMENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
     RAZORPAY: "logo-usd",
 };
 
-const PAYMENT_COLORS: Record<string, string> = {
-    UPI: "#6C5CE7",
-    CARD: "#0984E3",
-    COD: Colors.success,
-    WALLET: Colors.warning,
-    NETBANKING: Colors.primary,
-    RAZORPAY: "#E74C3C",
-};
-
 export default function StatsScreen() {
+    const { Colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
     const [activePeriod, setActivePeriod] = useState<StatsPeriod>("Week");
     const { data: stats, isLoading, refetch, isRefetching } = useRestaurantStats(activePeriod);
+
+    const PAYMENT_COLORS: Record<string, string> = useMemo(() => ({
+        UPI: "#6C5CE7",
+        CARD: "#0984E3",
+        COD: Colors.success,
+        WALLET: Colors.warning,
+        NETBANKING: Colors.primary,
+        RAZORPAY: "#E74C3C",
+    }), [Colors]);
 
     const chartData = stats?.chartData || [];
     const maxChartValue = Math.max(...chartData.map(d => d.value), 1);
@@ -54,7 +57,7 @@ export default function StatsScreen() {
     if (isLoading) {
         return (
             <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-                <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+                <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
                 <ActivityIndicator size="large" color={Colors.primary} />
                 <Text style={{ fontFamily: Fonts.brandMedium, color: Colors.muted, marginTop: 12 }}>
                     Loading stats…
@@ -65,7 +68,7 @@ export default function StatsScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? Colors.background : Colors.secondary} />
 
             {/* Period Tabs */}
             <View style={styles.periodRow}>
@@ -177,7 +180,7 @@ export default function StatsScreen() {
                                                     height: Math.max(h, 4),
                                                     backgroundColor: isHighest
                                                         ? Colors.primary
-                                                        : Colors.primary.slice(0, 7) + "40",
+                                                        : Colors.primary + "40",
                                                 },
                                             ]}
                                         />
@@ -208,7 +211,7 @@ export default function StatsScreen() {
                                 <View key={item.label} style={styles.breakdownItem}>
                                     <View style={[
                                         styles.breakdownIcon,
-                                        { backgroundColor: (PAYMENT_COLORS[item.label] || Colors.primary).slice(0, 7) + "22" }
+                                        { backgroundColor: (PAYMENT_COLORS[item.label] || Colors.primary) + "22" }
                                     ]}>
                                         <Ionicons
                                             name={PAYMENT_ICONS[item.label] || "ellipse-outline"}
@@ -325,7 +328,7 @@ export default function StatsScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.background },
     periodRow: {
         marginTop: 20,
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         padding: 4,
         marginBottom: 16,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
     },
     periodTab: {
@@ -350,7 +353,7 @@ const styles = StyleSheet.create({
         fontSize: FontSize.sm,
         color: Colors.muted,
     },
-    periodTabTextActive: { color: Colors.white, fontFamily: Fonts.brandBold },
+    periodTabTextActive: { color: isDark ? Colors.background : Colors.white, fontFamily: Fonts.brandBold },
     content: { paddingHorizontal: 16, paddingBottom: 24 },
     kpiRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
     kpiCard: {
@@ -358,8 +361,13 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface,
         borderRadius: 16,
         padding: 14,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.2 : 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     kpiLabel: { fontFamily: Fonts.brand, fontSize: 11, color: Colors.muted, marginBottom: 6 },
     kpiValue: { fontFamily: Fonts.brandBlack, fontSize: FontSize.xl, color: Colors.text },
@@ -370,8 +378,13 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 18,
         marginBottom: 16,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: Colors.border,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: isDark ? 0.3 : 0.05,
+        shadowRadius: 10,
+        elevation: 3,
     },
     cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
     cardTitle: { fontFamily: Fonts.brandBold, fontSize: FontSize.md, color: Colors.text, marginBottom: 16 },
@@ -392,7 +405,7 @@ const styles = StyleSheet.create({
     breakdownIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
     breakdownPct: { fontFamily: Fonts.brandBlack, fontSize: FontSize.xl, color: Colors.text },
     breakdownLabel: { fontFamily: Fonts.brand, fontSize: FontSize.xs, color: Colors.muted },
-    breakdownBar: { height: 6, backgroundColor: Colors.light, borderRadius: 3 },
+    breakdownBar: { height: 6, backgroundColor: Colors.background, borderRadius: 3 },
     breakdownFill: { height: 6, borderRadius: 3 },
     topItem: {
         flexDirection: "row",
@@ -406,7 +419,7 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 8,
-        backgroundColor: Colors.light,
+        backgroundColor: Colors.background,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -423,7 +436,7 @@ const styles = StyleSheet.create({
     ratingBars: { flex: 1, gap: 6, justifyContent: "center" },
     ratingBarRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     ratingBarLabel: { fontFamily: Fonts.brand, fontSize: 11, color: Colors.muted, width: 24 },
-    ratingBarTrack: { flex: 1, height: 6, backgroundColor: Colors.light, borderRadius: 3 },
+    ratingBarTrack: { flex: 1, height: 6, backgroundColor: Colors.background, borderRadius: 3 },
     ratingBarFill: { height: 6, borderRadius: 3, backgroundColor: Colors.primary },
     ratingBarPct: { fontFamily: Fonts.brand, fontSize: 10, color: Colors.muted, width: 28, textAlign: "right" },
     emptyState: { alignItems: "center", paddingVertical: 24, gap: 8 },

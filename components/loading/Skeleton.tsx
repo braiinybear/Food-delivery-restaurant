@@ -1,17 +1,18 @@
 import React from "react";
 import { View, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function Skeleton({
   style,
 }: {
   style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[styles.skeleton, style]} />;
+  const { Colors } = useTheme();
+  return <View style={[styles.skeleton, { backgroundColor: Colors.border }, style]} />;
 }
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: "#E5E7EB",
     borderRadius: 8,
   },
 });

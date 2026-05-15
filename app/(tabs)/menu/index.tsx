@@ -1,4 +1,4 @@
-import { Colors } from "@/constants/colors";
+import { ThemeType } from "@/constants/colors";
 import { FontSize, Fonts } from "@/constants/typography";
 import {
   useCreateMenuCategory,
@@ -9,7 +9,7 @@ import { useMyRestaurant } from "@/hooks/useRestaurantPartnerRequest";
 import { MenuCategory, MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -29,18 +29,16 @@ import { uploadImageToCloudinary, validateImage } from "@/utility/cloudinary";
 import { showAlert } from "@/store/useAlertStore";
 import MenuCategorySkeleton from "@/components/loading/MenuCategory";
 import MenuItemSkeleton from "@/components/loading/MenuItemSkelton";
+import { useTheme } from "@/context/ThemeContext";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const TYPE_ICONS: Record<
-  string,
-  { icon: keyof typeof Ionicons.glyphMap; color: string }
-> = {
-  VEG: { icon: "leaf-outline", color: "#2ECC71" },
-  NON_VEG: { icon: "nutrition-outline", color: "#E74C3C" },
-  EGG: { icon: "ellipse-outline", color: "#F39C12" },
-  VEGAN: { icon: "flower-outline", color: "#27AE60" },
-};
+const getCuisineTypeStyles = (Colors: ThemeType) => ({
+  VEG: { icon: "leaf-outline" as const, color: Colors.success },
+  NON_VEG: { icon: "nutrition-outline" as const, color: Colors.danger },
+  EGG: { icon: "ellipse-outline" as const, color: Colors.secondary },
+  VEGAN: { icon: "flower-outline" as const, color: Colors.success },
+});
 
 // ─── Category Chip ───────────────────────────────────────────────────────────
 
@@ -51,6 +49,8 @@ function CategoryChip({
   category: MenuCategory;
   onPress: () => void;
 }) {
+  const { Colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
   return (
     <TouchableOpacity
       style={styles.chip}
@@ -79,7 +79,11 @@ function CategoryChip({
 // ─── Menu Item Card ──────────────────────────────────────────────────────────
 
 function MenuItemCard({ item }: { item: MenuItem }) {
-  const typeInfo = TYPE_ICONS[item.type] ?? {
+  const { Colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
+  const TYPE_ICONS = useMemo(() => getCuisineTypeStyles(Colors), [Colors]);
+  
+  const typeInfo = TYPE_ICONS[item.type as keyof typeof TYPE_ICONS] ?? {
     icon: "help-circle-outline",
     color: Colors.muted,
   };
@@ -113,7 +117,7 @@ function MenuItemCard({ item }: { item: MenuItem }) {
         {/* Left info */}
         <View style={styles.menuCardLeft}>
           {/* Type badge */}
-          <View style={[styles.typeBadge, { borderColor: typeInfo.color }]}>
+          <View style={[styles.typeBadge, { borderColor: typeInfo.color + "40", backgroundColor: typeInfo.color + "10" }]}>
             <Ionicons name={typeInfo.icon} size={10} color={typeInfo.color} />
             <Text style={[styles.typeBadgeText, { color: typeInfo.color }]}>
               {item.type?.replace("_", " ")}
@@ -167,7 +171,6 @@ function MenuItemCard({ item }: { item: MenuItem }) {
               {item.isAvailable ? "Available" : "Unavailable"}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.muted} />
         </View>
       </View>
     </TouchableOpacity>
@@ -185,6 +188,8 @@ function AddCategoryModal({
   restaurantId: string;
   onClose: () => void;
 }) {
+  const { Colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [categoryImage, setCategoryImage] = useState<string | null>(null);
@@ -204,7 +209,6 @@ function AddCategoryModal({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
 
-        // ─── Validate image before uploading ─────────────────────────────
         try {
           await validateImage(imageUri, 5); // 5MB max
         } catch (validationError) {
@@ -217,12 +221,10 @@ function AddCategoryModal({
           return;
         }
 
-        // ─── Start cloudinary upload ────────────────────────────────
         setIsCloudinaryUploading(true);
         setUploadProgress(0);
 
         try {
-          // ─── Simulate progress (0% → 50%) ──────────────────────────
           const progressInterval = setInterval(() => {
             setUploadProgress((prev) => {
               if (prev >= 50) {
@@ -233,7 +235,6 @@ function AddCategoryModal({
             });
           }, 200);
 
-          // ─── Upload to Cloudinary ───────────────────────────────
           const response = await uploadImageToCloudinary(
             imageUri,
             "menu_categories",
@@ -242,25 +243,15 @@ function AddCategoryModal({
           clearInterval(progressInterval);
           setUploadProgress(100);
 
-          // ─── Validate response and store the secure URL ─────────────────────────────
           if (!response.secure_url) {
             throw new Error("No image URL returned from Cloudinary");
           }
 
-          console.log("Cloudinary response:", {
-            url: response.secure_url,
-            folder: response.folder,
-          });
           setCategoryImage(response.secure_url);
 
-          // ─── Verify image was set ──────────────────────────────
-          setTimeout(() => {
-            console.log("Image state after set:", response.secure_url);
-          }, 100);
           setIsCloudinaryUploading(false);
           setUploadProgress(0);
 
-          // ─── Show success message ──────────────────────────────
           showAlert(
             "Success! ✅",
             "Category image uploaded to cloud successfully",
@@ -298,12 +289,6 @@ function AddCategoryModal({
       return;
     }
 
-    console.log("Creating category with:", {
-      name: name.trim(),
-      image: categoryImage,
-      type: type || undefined,
-    });
-
     createCategory(
       {
         name: name.trim(),
@@ -334,7 +319,7 @@ function AddCategoryModal({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       {/* Cloudinary Upload Loading Overlay */}
@@ -384,139 +369,140 @@ function AddCategoryModal({
         style={styles.modalOverlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
-        >
-          <View style={styles.modalCard}>
-            {/* Handle */}
-            <View style={styles.modalHandle} />
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={styles.modalCard}>
+          {/* Handle */}
+          <View style={styles.modalHandle} />
 
-            <View style={styles.modalHeader}>
-              <View style={styles.modalIconWrap}>
-                <Ionicons name="grid" size={22} color={Colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.modalTitle}>New Category</Text>
-                <Text style={styles.modalSubtitle}>
-                  Organise your menu with a new category
-                </Text>
-              </View>
+          <View style={styles.modalHeader}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="grid" size={22} color={Colors.primary} />
             </View>
-
-            {/* Image Upload Section */}
-            <Text style={styles.inputLabel}>Category Image</Text>
-            <TouchableOpacity
-              style={[
-                styles.uploadCard,
-                categoryImage && {
-                  borderColor: Colors.primary,
-                  borderStyle: "solid",
-                },
-              ]}
-              onPress={pickImage}
-              disabled={isCloudinaryUploading}
-              activeOpacity={0.7}
-            >
-              {categoryImage ? (
-                <>
-                  <Image
-                    source={{ uri: categoryImage }}
-                    style={styles.uploadCardImage}
-                  />
-                  <View style={styles.uploadCardOverlay}>
-                    <Ionicons name="camera" size={24} color={Colors.white} />
-                  </View>
-                </>
-              ) : (
-                <View style={styles.uploadCardContent}>
-                  <View style={styles.uploadCardIcon}>
-                    <Ionicons
-                      name="cloud-upload-outline"
-                      size={28}
-                      color={Colors.primary}
-                    />
-                  </View>
-                  <View style={styles.uploadCardText}>
-                    <Text style={styles.uploadCardTitle}>Upload Image</Text>
-                    <Text style={styles.uploadCardSubtitle}>
-                      Tap to select from gallery
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.inputLabel}>Category Name</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. Starters, Beverages…"
-              placeholderTextColor={Colors.muted}
-              value={name}
-              onChangeText={setName}
-              returnKeyType="next"
-              editable={!isCloudinaryUploading}
-            />
-
-            <Text style={styles.inputLabel}>Category Type (Optional)</Text>
-            <View style={styles.typeContainer}>
-              {["VEG", "NON_VEG", "VEGAN"].map((categoryType) => (
-                <TouchableOpacity
-                  key={categoryType}
-                  style={[
-                    styles.typeButton,
-                    type === categoryType && styles.typeButtonSelected,
-                  ]}
-                  onPress={() => setType(categoryType)}
-                  disabled={isCloudinaryUploading}
-                >
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      type === categoryType && styles.typeButtonTextSelected,
-                    ]}
-                  >
-                    {categoryType.replace("_", " ")}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setName("");
-                  setType("");
-                  setCategoryImage(null);
-                  onClose();
-                }}
-                activeOpacity={0.7}
-                disabled={isCloudinaryUploading}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.addButton,
-                  (isPending || isCloudinaryUploading) && { opacity: 0.6 },
-                ]}
-                onPress={handleAdd}
-                disabled={isPending || isCloudinaryUploading}
-                activeOpacity={0.8}
-              >
-                {isPending || isCloudinaryUploading ? (
-                  <ActivityIndicator size="small" color={Colors.white} />
-                ) : (
-                  <>
-                    <Ionicons name="add" size={18} color={Colors.white} />
-                    <Text style={styles.addButtonText}>Add Category</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+            <View>
+              <Text style={styles.modalTitle}>New Category</Text>
+              <Text style={styles.modalSubtitle}>
+                Organise your menu with a new category
+              </Text>
             </View>
           </View>
-        </ScrollView>
+
+          {/* Image Upload Section */}
+          <Text style={styles.inputLabel}>Category Image</Text>
+          <TouchableOpacity
+            style={[
+              styles.uploadCard,
+              categoryImage ? {
+                borderColor: Colors.primary,
+                borderStyle: "solid",
+              } : {},
+            ]}
+            onPress={pickImage}
+            disabled={isCloudinaryUploading}
+            activeOpacity={0.7}
+          >
+            {categoryImage ? (
+              <>
+                <Image
+                  source={{ uri: categoryImage }}
+                  style={styles.uploadCardImage}
+                />
+                <View style={styles.uploadCardOverlay}>
+                  <Ionicons name="camera" size={24} color={Colors.white} />
+                </View>
+              </>
+            ) : (
+              <View style={styles.uploadCardContent}>
+                <View style={styles.uploadCardIcon}>
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={28}
+                    color={Colors.primary}
+                  />
+                </View>
+                <View style={styles.uploadCardText}>
+                  <Text style={styles.uploadCardTitle}>Upload Image</Text>
+                  <Text style={styles.uploadCardSubtitle}>
+                    Tap to select from gallery
+                  </Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.inputLabel}>Category Name</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g. Starters, Beverages…"
+            placeholderTextColor={Colors.muted}
+            value={name}
+            onChangeText={setName}
+            returnKeyType="next"
+            editable={!isCloudinaryUploading}
+          />
+
+          <Text style={styles.inputLabel}>Category Type (Optional)</Text>
+          <View style={styles.typeContainer}>
+            {["VEG", "NON_VEG", "VEGAN"].map((categoryType) => (
+              <TouchableOpacity
+                key={categoryType}
+                style={[
+                  styles.typeButton,
+                  type === categoryType && styles.typeButtonSelected,
+                ]}
+                onPress={() => setType(categoryType)}
+                disabled={isCloudinaryUploading}
+              >
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    type === categoryType && styles.typeButtonTextSelected,
+                  ]}
+                >
+                  {categoryType.replace("_", " ")}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setName("");
+                setType("");
+                setCategoryImage(null);
+                onClose();
+              }}
+              activeOpacity={0.7}
+              disabled={isCloudinaryUploading}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.addButton,
+                (isPending || isCloudinaryUploading) && { opacity: 0.6 },
+              ]}
+              onPress={handleAdd}
+              disabled={isPending || isCloudinaryUploading}
+              activeOpacity={0.8}
+            >
+              {isPending || isCloudinaryUploading ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <>
+                  <Ionicons name="add" size={18} color={Colors.white} />
+                  <Text style={styles.addButtonText}>Add Category</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -525,6 +511,8 @@ function AddCategoryModal({
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function MenuScreen() {
+  const { Colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(Colors, isDark), [Colors, isDark]);
   const [modalVisible, setModalVisible] = useState(false);
 
   const { data: restaurant, isLoading: restaurantLoading } = useMyRestaurant();
@@ -547,7 +535,7 @@ export default function MenuScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* ── Fixed Categories Section ── */}
       <View style={styles.categoriesSection}>
@@ -654,53 +642,16 @@ export default function MenuScreen() {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (Colors: ThemeType, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-
-  // Fixed categories section
   categoriesSection: {
     backgroundColor: Colors.background,
   },
-
-  // Header
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 52,
-    paddingBottom: 18,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  headerTitle: {
-    fontFamily: Fonts.brandBold,
-    fontSize: FontSize.xl,
-    color: Colors.white,
-    letterSpacing: 0.3,
-  },
-  headerSub: {
-    fontFamily: Fonts.brand,
-    fontSize: FontSize.xs,
-    color: Colors.white + "BB",
-    marginTop: 2,
-  },
-  headerSearchBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  // Scroll
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
-
-  // Section label row
   sectionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -715,13 +666,11 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     letterSpacing: 2,
   },
-
-  // Add category button
   addCategoryBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -731,8 +680,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.primary,
   },
-
-  // Category chips
   chipScroll: {
     paddingLeft: 18,
     paddingRight: 8,
@@ -754,7 +701,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 14,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -776,149 +723,129 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     marginTop: 1,
   },
-
-  // Divider
   divider: {
     height: 1,
     backgroundColor: Colors.border,
     marginHorizontal: 18,
     marginTop: 8,
   },
-
-  // Count badge
-  countBadge: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  countBadgeText: {
-    fontFamily: Fonts.brandBold,
-    fontSize: FontSize.xs,
-    color: Colors.white,
-  },
-
-  // Menu item card
   menuCard: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
+    flexDirection: "row",
     backgroundColor: Colors.surface,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    flexDirection: "row",
     overflow: "hidden",
-    minHeight: 110,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.2 : 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   availStrip: {
     width: 4,
+    height: "100%",
   },
   menuItemThumbnail: {
-    width: 80,
+    width: 90,
     height: "100%",
-    backgroundColor: Colors.light,
   },
   menuCardBody: {
     flex: 1,
+    padding: 12,
     flexDirection: "row",
-    padding: 14,
-    gap: 10,
+    justifyContent: "space-between",
   },
   menuCardLeft: {
     flex: 1,
-    gap: 4,
+    paddingRight: 8,
   },
   typeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
     alignSelf: "flex-start",
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    marginBottom: 6,
+    gap: 3,
   },
   typeBadgeText: {
-    fontFamily: Fonts.brandMedium,
-    fontSize: 10,
-    letterSpacing: 0.3,
+    fontFamily: Fonts.brandBold,
+    fontSize: 8,
+    letterSpacing: 0.5,
   },
   menuItemName: {
     fontFamily: Fonts.brandBold,
     fontSize: FontSize.md,
     color: Colors.text,
-    marginTop: 2,
   },
   menuItemDesc: {
     fontFamily: Fonts.brand,
-    fontSize: FontSize.xs,
+    fontSize: 11,
     color: Colors.muted,
-    lineHeight: 16,
+    marginTop: 2,
+    lineHeight: 15,
   },
   menuItemMeta: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
   },
   metaChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: Colors.light,
-    borderRadius: 8,
+    backgroundColor: Colors.background,
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
   },
   metaChipBestseller: {
-    backgroundColor: Colors.secondary + "22",
+    backgroundColor: Colors.secondary + "15",
   },
   metaChipText: {
-    fontFamily: Fonts.brand,
+    fontFamily: Fonts.brandMedium,
     fontSize: 10,
     color: Colors.muted,
   },
   menuCardRight: {
     alignItems: "flex-end",
     justifyContent: "space-between",
-    minWidth: 90,
-    gap: 6,
+    minWidth: 80,
   },
   menuItemPrice: {
     fontFamily: Fonts.brandBlack,
-    fontSize: FontSize.lg,
-    color: Colors.primary,
+    fontSize: FontSize.md,
+    color: Colors.text,
   },
   availBadge: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    justifyContent: "center",
-    minWidth: 85,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
   },
   availBadgeText: {
-    fontFamily: Fonts.brandMedium,
-    fontSize: FontSize.xs,
-    textAlign: "center",
+    fontFamily: Fonts.brandBold,
+    fontSize: 9,
   },
-
-  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    padding: 24,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 12,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    minHeight: "60%",
   },
   modalHandle: {
     width: 40,
@@ -938,7 +865,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -968,48 +895,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.brand,
     fontSize: FontSize.md,
     color: Colors.text,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     marginBottom: 24,
-  },
-  imageUploadButton: {
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: 14,
-    borderStyle: "dashed",
-    height: 160,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 24,
-    backgroundColor: Colors.surface,
-  },
-  uploadPlaceholder: {
-    alignItems: "center",
-    gap: 8,
-  },
-  uploadedImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 12,
-  },
-  uploadText: {
-    fontFamily: Fonts.brandMedium,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
-  },
-  uploadProgressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 10,
-  },
-  uploadProgressText: {
-    fontFamily: Fonts.brandMedium,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
   },
   uploadCard: {
     borderWidth: 1.5,
@@ -1017,7 +904,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 24,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     borderStyle: "dashed",
     overflow: "hidden",
     minHeight: 100,
@@ -1040,7 +927,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: "100%",
     height: 120,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 10,
@@ -1049,7 +936,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1058,24 +945,25 @@ const styles = StyleSheet.create({
   },
   uploadCardTitle: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: Fonts.brandBold,
     color: Colors.text,
     marginBottom: 2,
   },
   uploadCardSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    fontFamily: Fonts.brand,
+    color: Colors.muted,
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
   },
   uploadingModal: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
     paddingVertical: 40,
     paddingHorizontal: 30,
     width: "80%",
@@ -1092,14 +980,15 @@ const styles = StyleSheet.create({
   },
   uploadingTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: Fonts.brandBold,
     color: Colors.text,
     marginBottom: 8,
     textAlign: "center",
   },
   uploadingSubtitle: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    fontFamily: Fonts.brand,
+    color: Colors.muted,
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 18,
@@ -1113,7 +1002,7 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     width: "100%",
     height: 8,
-    backgroundColor: Colors.light,
+    backgroundColor: Colors.background,
     borderRadius: 4,
     overflow: "hidden",
   },
@@ -1122,7 +1011,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   progressPercentage: {
-    fontWeight: "700",
+    fontFamily: Fonts.brandBold,
     fontSize: 13,
     color: Colors.primary,
   },
@@ -1131,6 +1020,7 @@ const styles = StyleSheet.create({
   },
   uploadingHint: {
     fontSize: 12,
+    fontFamily: Fonts.brand,
     color: Colors.muted,
     textAlign: "center",
     marginTop: 12,
@@ -1147,7 +1037,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   typeButtonSelected: {
     backgroundColor: Colors.primary,
@@ -1156,10 +1046,11 @@ const styles = StyleSheet.create({
   typeButtonText: {
     fontFamily: Fonts.brandMedium,
     fontSize: FontSize.sm,
-    color: Colors.text,
+    color: Colors.muted,
   },
   typeButtonTextSelected: {
     color: Colors.white,
+    fontFamily: Fonts.brandBold,
   },
   modalActions: {
     flexDirection: "row",
@@ -1169,7 +1060,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 14,
-    backgroundColor: Colors.light,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: "center",
   },
   cancelButtonText: {
@@ -1241,7 +1134,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary + "15",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 4,
